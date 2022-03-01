@@ -1,3 +1,5 @@
+"""Metamodel implementation."""
+
 import torch
 
 from gcn import GCNModel
@@ -33,47 +35,47 @@ class MetaModel(torch.nn.Module):
         ]
 
 
-        def forward(self, x):
-            """
-            Performs forward pass for all submodels and combines their output.
-            """
-            # GCNModel output is matrix with hyperplanes in size [batchsize * embed_dim],
-            # we concatenate these along the first axis.
-            hyp_list = [gcn(x) for gcn in self.submodels]
-            hyp_matrix = torch.cat((hyp_list), 1)
-            return hyp_matrix
+    def forward(self, x):
+        """
+        Performs forward pass for all submodels and combines their output.
+        """
+        # GCNModel output is matrix with hyperplanes in size [batchsize * embed_dim],
+        # we concatenate these along the first axis.
+        hyp_list = [gcn(x) for gcn in self.submodels]
+        hyp_matrix = torch.cat((hyp_list), 1)
+        return hyp_matrix
 
 
-        def bucket_loss(self, hyp_matrix, answers):
-            """
-            Calculates the loss of a single bucket based on hyperplanes
-            and the correct answer.
-            """
-            loss = 0
-            return loss
+    def bucket_loss(self, hyp_matrix, answers):
+        """
+        Calculates the loss of a single bucket based on hyperplanes
+        and the correct answer.
+        """
+        raise NotImplementedError
 
 
-        def contains_answer(self, hyp_matrix, answers):
-            """
-            Returns indicator for if the bucket contains the answer set.
-            """
-            pass
+    def contains_answer(self, hyp_matrix, answers):
+        """
+        Returns indicator for if the bucket contains the answer set.
+        """
+        raise NotImplementedError
 
 
-        def calculate_loss(self, hyp_matrix, answers):
-            # get buckets: list of Tensors [batchsize, embed_dim * num_planes], size = num_buckets
-            buckets = torch.chunk(hyp_matrix, self.num_buckets, dim=1)
-            
-            # calculate proxy loss per bucket
-            proxy_losses = [bucket_loss(bucket, answers) for bucket in buckets]
+    def calculate_loss(self, hyp_matrix, answers):
+        # get buckets: list of Tensors [batchsize, embed_dim * num_planes], size = num_buckets
+        buckets = torch.chunk(hyp_matrix, self.num_buckets, dim=1)
+        
+        # calculate proxy loss per bucket
+        proxy_losses = [self.bucket_loss(bucket, answers) for bucket in buckets]
 
-            # delegate loss for each bucket
-            loss_indicator = [contains_answer(bucket, answers) for bucket in buckets]
+        # indicator that decides if bucket loss takes part in final loss
+        loss_indicator = [self.contains_answer(bucket, answers) for bucket in buckets]
 
-            # if no buckets contain correct answers: all buckets included in backward pass
-            # if one or more buckets contain correct answers: only those buckets included in backward pass
-            loss = 0
-            for pl, ind in zip(proxy_losses, loss_indicator):
-                if ind:
-                    loss += pl
-            return loss
+        # ---- LOSS LOGIC: ----
+        # if no buckets contain correct answers: all buckets included in backward pass
+        # if one or more buckets contain correct answers: only those buckets included in backward pass
+        loss = 0
+        for pl, ind in zip(proxy_losses, loss_indicator):
+            if ind:
+                loss += pl
+        return loss

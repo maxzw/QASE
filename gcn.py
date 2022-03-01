@@ -18,11 +18,14 @@ class GCNModel(torch.nn.Module):
         assert readout in ['max', 'sum', 'TM']
         
         layers = []
-        for _ in range(num_layers):
+        for _ in range(num_layers - 1):
             layers += [
                 CompGCNConv(embed_dims, embed_dims, num_rels), # find out what the 'params' arg needs!
                 nn.ReLU()
             ]
+        layers += [
+            CompGCNConv(embed_dims, embed_dims, num_rels)
+        ]
         self.layers = nn.ModuleList(layers)
 
         self.readout_str = readout
@@ -59,7 +62,7 @@ class GCNModel(torch.nn.Module):
                 x = layer(x, edge_index, edge_type, rel_embed)
             else: # ReLU
                 x = layer(x)
-        out = self.readout(x)
+        out = self.readout(x) # fix arguments
         return out
 
 
