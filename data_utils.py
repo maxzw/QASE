@@ -21,10 +21,10 @@ def load_graph(data_dir, embed_dim):
     num_nodes = sum(node_mode_counts.values())
 
     new_node_maps = torch.ones(num_nodes + 1, dtype=torch.long).fill_(-1)
-    for mode, id_list in node_maps.items():
-        for i, id in enumerate(id_list):
-            assert new_node_maps[id] == -1
-            new_node_maps[id] = i
+    for m, id_list in node_maps.items():
+        for i, n in enumerate(id_list):
+            assert new_node_maps[n] == -1
+            new_node_maps[n] = i
 
     node_maps = new_node_maps
     feature_dims = {m : embed_dim for m in rels}
