@@ -44,7 +44,7 @@ class QueryBatch:
 
 
 def collate_query_data(queries: Sequence[Query]) -> QueryBatch:
-    """Given a list of graph.Query objects returns a loader.QueryBatch object."""
+    """Given a list of graph.Query objects returns a QueryBatch dataset."""
     
     batch_size = len(queries)
 

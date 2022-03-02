@@ -68,7 +68,7 @@ class GCNModel(nn.Module):
         return targets
 
     def vectorize_batch(self, batch: QueryBatch) -> VectorizedQueryBatch:
-        """Converts IDs to embeddings and vectorizes query graphs."""
+        """Converts batch data and global IDs to embeddings and batch-local IDs."""
         
         # empty tensors
         ent_e       = torch.empty(batch.batch_size, batch.num_entities, self.embed_dim).to(self.device)
