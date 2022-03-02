@@ -2,29 +2,29 @@ from helper import *
 from CompGCN.message_passing import MessagePassing
 
 class CompGCNConv(MessagePassing):
-	def __init__(self, in_channels, out_channels, num_rels, act=lambda x:x, params=None):
+	def __init__(self, in_channels, out_channels, bias=True, opn='corr', dropout=0):
 		super(self.__class__, self).__init__()
 
-		self.p 				= params
 		self.in_channels	= in_channels
 		self.out_channels	= out_channels
-		self.num_rels 		= num_rels
-		self.act 			= act
+		self.bias 			= bias
+		self.opn 			= opn
+		self.dropout 		= dropout
 		self.device			= None
 
 		self.w_loop			= get_param((in_channels, out_channels))
 		self.w_in			= get_param((in_channels, out_channels))
 		self.w_out			= get_param((in_channels, out_channels))
 		self.w_rel 			= get_param((in_channels, out_channels))
-		self.loop_rel 		= get_param((1, in_channels));
+		self.loop_rel 		= get_param((1, in_channels))
 
-		self.drop			= torch.nn.Dropout(self.p.dropout)
+		self.drop			= torch.nn.Dropout(self.dropout)
 		self.bn				= torch.nn.BatchNorm1d(out_channels)
 
-		if self.p.bias: 
-			self.register_parameter('bias', Parameter(torch.zeros(out_channels)))
+		if self.bias: 
+			self.register_parameter('bias_conv', Parameter(torch.zeros(out_channels)))
 
-	def forward(self, x, edge_index, edge_type, rel_embed): 
+	def forward(self, x, edge_index, edge_type, rel_embed):
 		if self.device is None:
 			self.device = edge_index.device
 
@@ -42,19 +42,19 @@ class CompGCNConv(MessagePassing):
 		self.out_norm    = self.compute_norm(self.out_index, num_ent)
 		
 		in_res		= self.propagate('add', self.in_index,   x=x, edge_type=self.in_type,   rel_embed=rel_embed, edge_norm=self.in_norm, 	mode='in')
-		loop_res	= self.propagate('add', self.loop_index, x=x, edge_type=self.loop_type, rel_embed=rel_embed, edge_norm=None, 		mode='loop')
+		loop_res	= self.propagate('add', self.loop_index, x=x, edge_type=self.loop_type, rel_embed=rel_embed, edge_norm=None, 			mode='loop')
 		out_res		= self.propagate('add', self.out_index,  x=x, edge_type=self.out_type,  rel_embed=rel_embed, edge_norm=self.out_norm,	mode='out')
 		out			= self.drop(in_res)*(1/3) + self.drop(out_res)*(1/3) + loop_res*(1/3)
 
-		if self.p.bias: out = out + self.bias
+		if self.bias: out = out + self.bias
 		out = self.bn(out)
 
-		return self.act(out), torch.matmul(rel_embed, self.w_rel)[:-1]		# Ignoring the self loop inserted
+		return out, torch.matmul(rel_embed, self.w_rel)[:-1]		# Ignoring the self loop inserted
 
 	def rel_transform(self, ent_embed, rel_embed):
-		if   self.p.opn == 'corr': 	trans_embed  = ccorr(ent_embed, rel_embed)
-		elif self.p.opn == 'sub': 	trans_embed  = ent_embed - rel_embed
-		elif self.p.opn == 'mult': 	trans_embed  = ent_embed * rel_embed
+		if   self.opn == 'corr': 	trans_embed  = ccorr(ent_embed, rel_embed)
+		elif self.opn == 'sub': 		trans_embed  = ent_embed - rel_embed
+		elif self.opn == 'mult': 	trans_embed  = ent_embed * rel_embed
 		else: raise NotImplementedError
 
 		return trans_embed
