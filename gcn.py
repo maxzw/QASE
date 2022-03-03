@@ -1,5 +1,6 @@
 """GCN model implementation using composition-based convolution."""
 
+import pickle
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -18,10 +19,11 @@ class GCNModel(nn.Module):
         self.num_layers = num_layers
         self.device = device
         assert readout in ['max', 'sum', 'TM']
+        self.readout_str = readout
 
         # create embeddings and lookup functions
-        self.ent_features, self.rel_features, self.embed_ents, self.embed_rels = \
-            self.build_embeddings(data_dir, embed_dim)
+        # variable embeddings are in their respective mode list with index [-1]
+        self.build_embeddings(data_dir, embed_dim)
         
         # create message passing layers
         layers = []
@@ -41,8 +43,7 @@ class GCNModel(nn.Module):
         ]
         self.layers = nn.ModuleList(layers)
 
-        # define readout
-        self.readout_str = readout
+        # define readout function
         if readout == 'max':
             self.readout = self.max_readout
         elif readout == 'sum':
@@ -50,9 +51,49 @@ class GCNModel(nn.Module):
         elif readout == 'TM':
             self.readout = self.target_message_readout
 
-    def build_embeddings():
+    def build_embeddings(self):
         """Builds embeddings for both entities (including variables) and relations."""
-        return
+        
+        # load data and statistics
+        rels, adj_lists, node_maps = pickle.load(open(self.data_dir+"/graph_data.pkl", "rb"))
+        node_mode_counts = {mode: len(node_maps[mode]) for mode in node_maps}
+        num_nodes = sum(node_mode_counts.values())
+        
+        # create and initialize entity embeddings
+        self.ent_features = nn.ParameterDict({
+            mode : torch.nn.Embedding(
+                node_mode_counts[mode] + 1, 
+                self.embed_dim).weight.data.normal_(0, 1./self.embed_dim) \
+                 for mode in rels
+            })
+        
+        # create mapping from global id to type-specific id
+        new_node_maps = torch.ones(num_nodes + 1, dtype=torch.long).fill_(-1)
+        for mode, id_list in node_maps.items():
+            for i, n in enumerate(id_list):
+                assert new_node_maps[n] == -1
+                new_node_maps[n] = i
+        self.node_maps = new_node_maps
+
+        # create lookup function
+        self.embed_ents = lambda nodes, mode: self.ent_features[mode](self.node_maps[nodes])
+
+        # create mapping from rel str to rel ID
+        rel_maps = {}
+        rel_counter = 0
+        for fr in list(rels.keys()):
+            for to_r in rels[fr]:
+                to, r = to_r
+                rel_id = (fr, r, to)
+                if rel_id not in rel_maps:
+                    rel_maps[rel_id] = rel_counter
+                    rel_counter += 1
+                self.rel_features = None
+                self.embed_rels = None
+        self.rel_maps = rel_maps
+
+        # create relation embeddings
+        self.rel_features = torch.nn.Embedding(len(rel_maps), self.embed_dim)
 
     def max_readout(self, embs, batch_idx, **kwargs):
         out, argmax = scatter_max(embs, batch_idx, dim=0)
