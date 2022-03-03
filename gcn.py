@@ -11,15 +11,17 @@ from loader import QueryBatch, VectorizedQueryBatch
 
 
 class GCNModel(nn.Module):
-    def __init__(self, embed_dim, num_layers, readout, device=None):
+    def __init__(self, data_dir, embed_dim, num_layers, readout, device=None):
         super().__init__()
+        self.data_dir = data_dir
         self.embed_dim = embed_dim
         self.num_layers = num_layers
         self.device = device
         assert readout in ['max', 'sum', 'TM']
 
-        # get node embeddings
-        # create relation embeddings (normal + inverse relations)
+        # create embeddings and lookup functions
+        self.ent_features, self.rel_features, self.embed_ents, self.embed_rels = \
+            self.build_embeddings(data_dir, embed_dim)
         
         # create message passing layers
         layers = []
@@ -48,6 +50,10 @@ class GCNModel(nn.Module):
         elif readout == 'TM':
             self.readout = self.target_message_readout
 
+    def build_embeddings():
+        """Builds embeddings for both entities (including variables) and relations."""
+        return
+
     def max_readout(self, embs, batch_idx, **kwargs):
         out, argmax = scatter_max(embs, batch_idx, dim=0)
         return out
@@ -68,18 +74,17 @@ class GCNModel(nn.Module):
         return targets
 
     def vectorize_batch(self, batch: QueryBatch) -> VectorizedQueryBatch:
-        """Converts batch data and global IDs to embeddings and batch-local IDs."""
+        """Converts batch data with global IDs to embeddings."""
         
-        # empty tensors
-        ent_e       = torch.empty(batch.batch_size, batch.num_entities, self.embed_dim).to(self.device)
-        edge_index  = torch.empty(batch.batch_size, 2, batch.num_edges).to(self.device)
-        edge_type   = torch.empty(batch.batch_size, batch.num_edges).to(self.device)
-        rel_e       = torch.empty(batch.batch_size, 2 * batch.num_relations, self.embed_dim).to(self.device)
-
-        # fill tensors
-        # ...
+        batch_idx   = torch.Tensor(batch.batch_idx).to(self.device)
+        edge_index  = torch.Tensor(batch.edge_index).to(self.device)
+        edge_type   = torch.Tensor(batch.edge_type).to(self.device)
+        # extract entity and relation embeddings using lookup functions
+        ent_e       = torch.Tensor(self.embed_ents(batch.entity_id, batch.entity_type)).to(self.device)
+        rel_e       = torch.Tensor(self.embed_rels(batch.edge_type)).to(self.device)
         
         return VectorizedQueryBatch(
+            batch_idx=batch_idx,
             ent_e=ent_e,
             edge_index=edge_index,
             edge_type=edge_type,
@@ -90,22 +95,22 @@ class GCNModel(nn.Module):
 
         # get and unpack vectorized data
         data: VectorizedQueryBatch = self.vectorize_batch(batch)
-        ent_e, edge_index, edge_type, rel_e = data.ent_e, data.edge_index, data.edge_type, data.rel_e
+        ent_e, rel_e = data.ent_e, data.rel_e
 
         # perform message passing
         for layer in self.layers:
             if isinstance(layer, MessagePassing):
-                ent_e, rel_e = layer(ent_e, edge_index, edge_type, rel_e)
+                ent_e, rel_e = layer(ent_e, data.edge_index, data.edge_type, rel_e)
             else:
                 ent_e = layer(ent_e)
 
         # aggregate node embeddings
         out = self.readout(
             embs        =   ent_e,
-            batch_idx   =   data.batch_idx, # TODO: include these in either batch or data.
-            batch_size  =   data.batch_size,
-            num_nodes   =   data.num_nodes,
-            num_anchors =   data.num_anchors
+            batch_idx   =   data.batch_idx,
+            batch_size  =   batch.batch_size,  
+            num_nodes   =   batch.num_entities,
+            num_anchors =   data.num_anchors # don't know...
             )
         return out
 

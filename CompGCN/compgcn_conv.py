@@ -2,12 +2,12 @@ from helper import *
 from CompGCN.message_passing import MessagePassing
 
 class CompGCNConv(MessagePassing):
-	def __init__(self, in_channels, out_channels, bias=True, opn='corr', dropout=0):
+	def __init__(self, in_channels, out_channels, use_bias=True, opn='corr', dropout=0):
 		super(self.__class__, self).__init__()
 
 		self.in_channels	= in_channels
 		self.out_channels	= out_channels
-		self.bias 			= bias
+		self.use_bias 		= use_bias
 		self.opn 			= opn
 		self.dropout 		= dropout
 		self.device			= None
@@ -21,8 +21,8 @@ class CompGCNConv(MessagePassing):
 		self.drop			= torch.nn.Dropout(self.dropout)
 		self.bn				= torch.nn.BatchNorm1d(out_channels)
 
-		if self.bias: 
-			self.register_parameter('bias_conv', Parameter(torch.zeros(out_channels)))
+		if self.use_bias: 
+			self.register_parameter('bias', Parameter(torch.zeros(out_channels)))
 
 	def forward(self, x, edge_index, edge_type, rel_embed):
 		if self.device is None:
@@ -53,7 +53,7 @@ class CompGCNConv(MessagePassing):
 
 	def rel_transform(self, ent_embed, rel_embed):
 		if   self.opn == 'corr': 	trans_embed  = ccorr(ent_embed, rel_embed)
-		elif self.opn == 'sub': 		trans_embed  = ent_embed - rel_embed
+		elif self.opn == 'sub': 	trans_embed  = ent_embed - rel_embed
 		elif self.opn == 'mult': 	trans_embed  = ent_embed * rel_embed
 		else: raise NotImplementedError
 
