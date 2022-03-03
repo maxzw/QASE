@@ -23,7 +23,7 @@ class GCNModel(nn.Module):
 
         # create embeddings and lookup functions
         # variable embeddings are in their respective mode list with index [-1]
-        self.build_embeddings(data_dir, embed_dim)
+        self.build_embeddings()
         
         # create message passing layers
         layers = []
@@ -59,13 +59,16 @@ class GCNModel(nn.Module):
         node_mode_counts = {mode: len(node_maps[mode]) for mode in node_maps}
         num_nodes = sum(node_mode_counts.values())
         
-        # create and initialize entity embeddings
-        self.ent_features = nn.ParameterDict({
+        # create and initialize entity embeddings # TODO: add to parameters
+        self.ent_features = {
             mode : torch.nn.Embedding(
                 node_mode_counts[mode] + 1, 
-                self.embed_dim).weight.data.normal_(0, 1./self.embed_dim) \
-                 for mode in rels
-            })
+                self.embed_dim
+                ).weight.data.normal_(0, 1./self.embed_dim) for mode in rels
+            }
+        print("\nCreated entity embeddings:")
+        for t in self.ent_features:
+            print(f"{t}:({len(self.ent_features[t])}, {self.embed_dim})")
         
         # create mapping from global id to type-specific id
         new_node_maps = torch.ones(num_nodes + 1, dtype=torch.long).fill_(-1)
@@ -75,8 +78,10 @@ class GCNModel(nn.Module):
                 new_node_maps[n] = i
         self.node_maps = new_node_maps
 
-        # create lookup function
-        self.embed_ents = lambda nodes, mode: self.ent_features[mode](self.node_maps[nodes])
+        # create entity lookup function (global_id: int, ent_type: str)
+        def ent_lookup(nodes, mode):
+            return self.ent_features[mode][self.node_maps[nodes]]
+        self.embed_ents = ent_lookup
 
         # create mapping from rel str to rel ID
         rel_maps = {}
@@ -93,7 +98,16 @@ class GCNModel(nn.Module):
         self.rel_maps = rel_maps
 
         # create relation embeddings
-        self.rel_features = torch.nn.Embedding(len(rel_maps), self.embed_dim)
+        self.rel_features = torch.nn.Embedding(len(rel_maps), self.embed_dim)   # TODO: Why is this not initialized?
+                                                                                # if init -> need [] instead of () in lookup
+        print("\nCreated relation embeddings:")
+        print(self.rel_features)
+
+        # create relation lookup function (rel_type: tuple(str, str, str))
+        def rel_lookup(rel_types):
+            rel_ids = torch.tensor([self.rel_maps[t] for t in rel_types])
+            return self.rel_features(rel_ids)
+        self.embed_rels = rel_lookup
 
     def max_readout(self, embs, batch_idx, **kwargs):
         out, argmax = scatter_max(embs, batch_idx, dim=0)
@@ -155,3 +169,31 @@ class GCNModel(nn.Module):
             )
         return out
 
+
+# test function
+if __name__ == "__main__":
+    
+    data_dir = "./data/AIFB/processed/"
+
+    model = GCNModel(
+        data_dir = data_dir,
+        embed_dim = 128,
+        num_layers = 2,
+        readout = 'sum'
+    )
+
+    # TODO make sure graph features are in module!
+    print('')
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name)
+    
+    print('')
+    print(model.embed_ents([1, 2, 3], 'person')) # NOTE required only one class, implement formula-specific batches!
+    rels = [
+        ('publication', 'http://wwww3org/1999/02/22-rdf-syntax-ns#type', 'class'),
+        ('publication', 'http://swrcontowareorg/ontology#publishes', 'organization'),
+        ('project', 'http://swrcontowareorg/ontology#hasProject', 'publication')
+    ]
+    print('')
+    print(model.embed_rels(rels))
