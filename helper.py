@@ -88,7 +88,12 @@ def conj(a):
 	return a
 
 def cconv(a, b):
-	return torch.irfft(com_mult(torch.rfft(a, 1), torch.rfft(b, 1)), 1, signal_sizes=(a.shape[-1],))
+	return torch.fft.irfft(com_mult(torch.fft.rfft(a, 1), torch.fft.rfft(b, 1)), 1, signal_sizes=(a.shape[-1],))
 
+# NOTE: things go wrong here since the first dimension is used for operations!
+# def ccorr(a, b):
+# 	return torch.fft.irfft(com_mult(conj(torch.fft.rfft(a, 1)), torch.fft.rfft(b, 1)), 1, signal_sizes=(a.shape[-1],))
+	
+# TODO: check if this one is correct
 def ccorr(a, b):
-	return torch.irfft(com_mult(conj(torch.rfft(a, 1)), torch.rfft(b, 1)), 1, signal_sizes=(a.shape[-1],))
+	return torch.fft.fftshift(torch.fft.irfft(conj(torch.fft.rfft(a)) * torch.fft.rfft(b)))

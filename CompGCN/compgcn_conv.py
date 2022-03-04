@@ -2,7 +2,7 @@ from helper import *
 from CompGCN.message_passing import MessagePassing
 
 class CompGCNConv(MessagePassing):
-	def __init__(self, in_channels, out_channels, use_bias=True, opn='corr', dropout=0):
+	def __init__(self, in_channels, out_channels, use_bias=True, opn='sub', dropout=0):
 		super(self.__class__, self).__init__()
 
 		self.in_channels	= in_channels
@@ -46,7 +46,8 @@ class CompGCNConv(MessagePassing):
 		out_res		= self.propagate('add', self.out_index,  x=x, edge_type=self.out_type,  rel_embed=rel_embed, edge_norm=self.out_norm,	mode='out')
 		out			= self.drop(in_res)*(1/3) + self.drop(out_res)*(1/3) + loop_res*(1/3)
 
-		if self.bias: out = out + self.bias
+		if self.use_bias: 
+			out = out + self.bias
 		out = self.bn(out)
 
 		return out, torch.matmul(rel_embed, self.w_rel)[:-1]		# Ignoring the self loop inserted
