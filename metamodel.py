@@ -1,9 +1,10 @@
 """Metamodel implementation."""
 
+import numpy as np
 import pickle
 import torch
 import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, var
 from typing import Sequence
 from torch_geometric.data import Data, Batch
 
@@ -18,13 +19,13 @@ class MetaModel(torch.nn.Module):
         self,
         data_dir,
         embed_dim=128,
-        num_hyperplanes=4,      # - GCN params
+        num_hyperplanes=4,
         gcn_layers=2,
         gcn_readout='sum',
         gcn_use_bias=True,
         gcn_opn='corr',
         gcn_dropout=0,
-        device=None             # - Device (CPU/GPU)
+        device=None
         ):
         super().__init__()
         self.data_dir = data_dir
@@ -41,13 +42,13 @@ class MetaModel(torch.nn.Module):
         self._build_embeddings()
 
         # initiate GCNModels
-        self.submodels = [
+        self.submodels = nn.ModuleList([
             GCNModel(
                 self.embed_dim,
                 self.gcn_layers,
                 self.gcn_readout
                 ) for _ in range(self.num_hyperplanes)
-        ]
+        ])
 
     def _build_embeddings(self):
         """
@@ -71,11 +72,17 @@ class MetaModel(torch.nn.Module):
         
         # create and initialize entity embeddings. For each type: (num_nodes + 1, embed_dim)
         self.ent_features = nn.ModuleDict()
+        self.var_features = nn.ModuleDict()
         for mode in rels:
             self.ent_features[mode] = torch.nn.Embedding(node_mode_counts[mode] + 1, self.embed_dim)
             self.ent_features[mode].weight.data.normal_(0, 1./self.embed_dim)
+            self.var_features[mode] = torch.nn.Embedding(1, self.embed_dim)
+            self.var_features[mode].weight.data.normal_(0, 1./self.embed_dim)
         print("\nCreated entity embeddings:")
         for m, e in self.ent_features.items():
+            print(f"    {m}: {e}")
+        print("\nCreated variable embeddings:")
+        for m, e in self.var_features.items():
             print(f"    {m}: {e}")
         
         # create mapping from global id to type-specific id
@@ -90,6 +97,11 @@ class MetaModel(torch.nn.Module):
         def _ent_lookup(nodes: Tensor, mode: str) -> Tensor:
             return self.ent_features[mode](self.node_maps[nodes])
         self.embed_ents = _ent_lookup
+
+        # create variable lookup function
+        def _var_lookup(mode: str) -> Tensor:
+            return self.var_features[mode](torch.tensor([0]))
+        self.embed_vars = _var_lookup
 
         # create mapping from rel str to rel ID
         rel_maps = {}
@@ -116,24 +128,55 @@ class MetaModel(torch.nn.Module):
     
     def vectorize_batch(self, formula: Formula, queries: Sequence[Query]) -> VectorizedQueryBatch:
         """Converts batch data with global IDs to embeddings."""
+        # general info
         batch_size = len(queries)
+        var_idx = loader.variable_node_idx[formula.query_type]
+        num_anchors = len(formula.anchor_modes)
+        num_nodes = num_anchors + len(var_idx)
+        batch_idx = torch.arange(0, batch_size).repeat_interleave(num_nodes)
+        target_idx = torch.full((batch_size,), num_nodes-1)
 
+        # get edge index
         edge_index = torch.tensor(loader.query_edge_indices[formula.query_type], dtype=torch.long)
         edge_data = Data(edge_index=edge_index)
+        edge_data.num_nodes = num_nodes
         batch = Batch.from_data_list([edge_data for i in range(batch_size)])
 
+        # get relation types
         rels = formula.get_rels()
         rel_idx = loader.query_edge_label_idx[formula.query_type]
-        edge_type = torch.tensor([self.rel_maps[_reverse_relation(rels[i])] for i in rel_idx], dtype=torch.long)
+        edge_embs = torch.empty((len(rel_idx), self.embed_dim))
+        edge_type = torch.empty((len(rel_idx)), dtype=torch.int64)
+        for i in rel_idx:
+            global_rel_id = self.rel_maps[_reverse_relation(rels[i])]
+            edge_embs[i] = self.embed_rels(torch.tensor([global_rel_id]))
+            edge_type[i] = i
+        edge_type = edge_type.repeat(batch_size)
+        
+        # get entity embeddings
+        anchor_ids = np.empty([batch_size, num_anchors]).astype(int)
+        # First rows of x contain embeddings of all anchor nodes
+        for i, anchor_mode in enumerate(formula.anchor_modes):
+            anchors = [q.anchor_nodes[i] for q in queries]
+            anchor_ids[:, i] = anchors
+        ent_e = torch.empty(batch_size, num_nodes, self.embed_dim)
+        for i, anchor_mode in enumerate(formula.anchor_modes):
+            ent_e[:, i] = self.embed_ents(anchor_ids[:, i], anchor_mode)
+        # all other rows contain variable embeddings
+        all_nodes = formula.get_nodes()
+        for i, var_id in enumerate(var_idx):
+            var_type = all_nodes[var_id]
+            ent_e[:, num_anchors+i] = self.embed_vars(var_type)
+        # then we reshape to feature matrix shape
+        ent_e = ent_e.reshape(-1, self.embed_dim)
 
-        edge_embs = self.embed_rels(edge_type)
-
+        # TODO: add all to device...
         return VectorizedQueryBatch(
             batch_size=batch_size,
-            num_nodes=None,
-            target_idx=None,
-            batch_idx=None,
-            ent_e=None,
+            num_nodes=edge_data.num_nodes,
+            target_idx=target_idx,
+            batch_idx=batch_idx,
+            ent_e=ent_e,
             edge_index=batch.edge_index,
             edge_type=edge_type,
             rel_e=edge_embs
@@ -149,14 +192,7 @@ from data_utils import load_queries_by_formula
 if __name__ == "__main__":
     
     data_dir = "./data/AIFB/processed/"
-    embed_dim = 8
-    
-    model = MetaModel(
-        data_dir=data_dir,
-        embed_dim=embed_dim,
-        num_hyperplanes=2,
-        gcn_readout='sum'
-    )
+    embed_dim = 128
 
     train_queries = load_queries_by_formula(data_dir + "/train_edges.pkl")
     # for i in range(2, 4):
@@ -166,4 +202,17 @@ if __name__ == "__main__":
     first_formula = list(chainqueries.keys())[0]
     formqueries = chainqueries[first_formula]
 
-    data = model.vectorize_batch(formula=first_formula, queries=formqueries)
+    model = MetaModel(
+        data_dir=data_dir,
+        embed_dim=embed_dim,
+        num_hyperplanes=16,
+        gcn_readout='sum'
+    )
+
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name)
+
+    out = model(formula=first_formula, queries=formqueries)
+    print(out)
+    print(out.size())

@@ -97,8 +97,8 @@ class GCNModel(nn.Module):
         out = self.readout(
             embs        =   ent_e,
             batch_idx   =   data.batch_idx,
-            batch_size  =   data.batch_size,    # might be changed based on processing
-            num_nodes   =   data.num_nodes,     # might be changed based on processing
-            target_id   =   data.target_idx     # might be changed based on processing
+            batch_size  =   data.batch_size,
+            num_nodes   =   data.num_nodes,
+            target_id   =   data.target_idx
             )
         return out
