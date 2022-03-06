@@ -1,16 +1,10 @@
-import numpy as np, sys, os, random, pdb, json, uuid, time, argparse
-from pprint import pprint
+import os, sys, json
+import numpy as np
 import logging, logging.config
-from collections import defaultdict as ddict
-# from ordered_set import OrderedSet
 
-# PyTorch related imports
 import torch
-from torch.nn import functional as F
 from torch.nn.init import xavier_normal_
-from torch.utils.data import DataLoader
 from torch.nn import Parameter
-from torch_scatter import scatter_add
 
 np.set_printoptions(precision=4)
 

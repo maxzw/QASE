@@ -7,8 +7,7 @@ from torch_scatter import scatter_add, scatter_max
 
 from CompGCN.compgcn_conv import CompGCNConv
 from CompGCN.message_passing import MessagePassing
-from loader import VectorizedQueryBatch
-
+from dataclass import VectorizedQueryBatch
 
 class GCNModel(nn.Module):
     def __init__(

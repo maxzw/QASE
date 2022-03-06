@@ -1,5 +1,6 @@
 from helper import *
 from CompGCN.message_passing import MessagePassing
+from torch_scatter import scatter_add
 
 class CompGCNConv(MessagePassing):
 	def __init__(self, in_channels, out_channels, use_bias=True, opn='sub', dropout=0):
