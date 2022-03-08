@@ -1,63 +1,60 @@
-"""Training script."""
+import torch
+from torch import Tensor
+from torch.utils.data import DataLoader
 
-from data_utils import load_queries_by_formula
-from metamodel import MetaModel
-from loader import *
+from evaluation import evaluate
+from loss import AnswerSpaceLoss
+from model import MetaModel
+
+def _train_epoch(
+    model: MetaModel,
+    dataloader: DataLoader,
+    loss_fn: AnswerSpaceLoss,
+    optimizer: torch.optim.Optimizer
+    ) -> Tensor:
+    """Train the model for one epoch."""
     
-data_dir = "./data/AIFB/processed/"
-embed_dim = 128
+    # put the model in train mode
+    model.train()
+    
+    epoch_loss = torch.zeros(size=tuple(), device=model.device)
+    for batch, targets in dataloader:
+        optimizer.zero_grad()
+        hyps = model(batch)
+        loss = loss_fn(hyps, targets.pos_embed, targets.neg_embed)
+        loss.backward()
+        optimizer.step()
+        epoch_loss += loss.detach() * batch.batch_size
+    return epoch_loss / len(dataloader)
 
-train_queries = load_queries_by_formula(data_dir + "/train_edges.pkl")
-# for i in range(2, 4):
-#     train_queries.update(load_queries_by_formula(data_dir + "/train_queries_{:d}.pkl".format(i)))
+def train(
+    model,
+    data_loaders,
+    loss_fn,
+    optimizer,
+    num_epochs,
+    eval_freq,
+    ):
+    
+    train_data_loader = data_loaders["train"]
+    valid_data_loader = data_loaders["valid"]
 
-chainqueries = train_queries['1-chain']
-first_formula = list(chainqueries.keys())[0]
-formqueries = chainqueries[first_formula]
+    # training
+    for epoch in range(num_epochs):
+        epoch_loss = _train_epoch(
+            model,
+            train_data_loader,
+            loss_fn,
+            optimizer
+            )
 
-model = MetaModel(
-    data_dir=data_dir,
-    embed_dim=embed_dim
-    )
+        # validation
+        if (epoch + 1) % eval_freq == 0:
+            val_results = evaluate(
+                model,
+                valid_data_loader,
+                loss_fn
+            )
 
-x, y_ids, y, y_neg = vectorize_batch(first_formula, formqueries, model)
-
-out = model(x)
-print(out.size())
-
-# --- regular iteration
-loss = model.calc_loss(x, y, y_neg)
-
-# --- every x iterations
-# loss, answers = model.calc_loss(x, y, y_neg, return_answers=True)
-# results = metrics(answers, y_ids)
-# process the results in some reporting class
-
-"""
-Loss ideas considering 1 entity, 1 band:
-
-First calculate loss for true answer:
-    1. For each hyperplane calculate dot product with answer entity embedding.
-    2. Apply tanh/sigmoid activation function to map to [0, 1] and get signature. --> fix saturated neurons!
-    3. Loss = distance between signature and [1, 1, 1, 1] -> is what we want.
-        - We can use loss = l - sum(signature) where l = length of signature.
-
-Second calculate loss for negative sample:
-    1. For each hyperplane calculate dot product with negative sample embedding.
-    2. Apply tanh/sigmoid activation function to map to [0, 1] and get signature.
-    3. Loss = 1 - distance between signature and [1, 1, 1, 1] -> is what we DONT want.
-
-Thirdly calculate loss for hyperplane diversity. Intuition is that vectors that point
-in the same direction have a high dot product -> minimize this.
-    1. Calculate sum of dot products of every combination of 2 hyperplanes in a band. 
-    This is called “n choose r” and its equation is n!/r!(n-r)!
-    For a band of 4 hyperplanes this is (4*3*2*1)/((2*1)(2*1)) = 24/4 = 6 combinations (reasonable!)
-
-The loss for one band can be calculated as follows:
-    - band_loss = loss_true + loss_false + loss_diversity*C where C is a hyperparameter
-
-Not every band needs backpropagation! Only backpropagate on bands that already contain the answer.
-If multiple bands contain the answer, these bands get backpropagated. 
-If no band contains the answer, all bands get backpropagated:
-    - total_loss = band_loss_i + band_loss_i+1 + ... 
-"""
+    training_report = epoch_loss + val_results
+    return training_report

@@ -4,7 +4,6 @@ from multiprocessing import Process
 from collections import Counter
 from multiprocessing import cpu_count
 from torch.utils.data import Dataset, DataLoader
-from graph import _reverse_relation
 import numpy as np
 from torch_geometric.data import Data, Batch
 import torch
@@ -12,7 +11,13 @@ import os.path as osp
 import random
 import os
 
-from graph import Graph, Query, _reverse_edge
+# added this to prevent error of pickling with multiprocessing
+import dill, multiprocessing
+dill.Pickler.dumps, dill.Pickler.loads = dill.dumps, dill.loads
+multiprocessing.reduction.ForkingPickler = dill.Pickler
+multiprocessing.reduction.dump = dill.dump
+
+from .graph import Graph, Query, _reverse_edge, _reverse_relation
 
 
 def load_graph(data_dir, embed_dim):
@@ -264,6 +269,23 @@ def parallel_sample(graph, num_workers, samples_per_worker, data_dir, test=False
 
     return queries_2, queries_3
 
+
+def preprocess_single_dataset(dataset, data_dir):
+    data_folder = f"{data_dir}/{dataset}/processed/"
+    make_train_test_edge_data(data_folder)
+    make_train_queries(data_folder)
+    make_test_queries(data_folder)
+    clean_test_queries(data_folder)
+    discard_negatives(data_folder)
+    return
+
+def preprocess_data(datasets, data_dir):
+    for dataset in datasets:
+        print(f"Preprocessing {dataset} dataset...")
+        preprocess_single_dataset(dataset, data_dir)
+    return
+
+############################## probably not  needed ##############################
 
 class QueryDataset(Dataset):
     """A dataset for queries of a specific type, e.g. 1-chain.
