@@ -32,26 +32,16 @@ class GCNModel(nn.Module):
         
         # create message passing layers
         layers = []
+        conv = CompGCNConv(
+            self.embed_dim,
+            self.embed_dim, 
+            use_bias=use_bias,
+            opn=opn,
+            dropout=dropout
+            )
         for _ in range(num_layers - 1):
-            layers += [
-                CompGCNConv(
-                    self.embed_dim,
-                    self.embed_dim, 
-                    use_bias=use_bias,
-                    opn=opn,
-                    dropout=dropout
-                    ),
-                nn.ReLU()
-            ]
-        layers += [
-            CompGCNConv(
-                self.embed_dim,
-                self.embed_dim, 
-                use_bias=use_bias,
-                opn=opn,
-                dropout=dropout
-                )
-        ]
+            layers += [conv, nn.ReLU()]
+        layers += [conv]
         self.layers = nn.ModuleList(layers)
 
         # define readout function

@@ -1,6 +1,7 @@
 """Metamodel implementation."""
 
 import pickle
+from typing import Sequence, Tuple, List
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -14,6 +15,7 @@ class MetaModel(torch.nn.Module):
         self,
         data_dir,
         embed_dim=128,
+        num_bands=4,
         num_hyperplanes=4,
         gcn_layers=2,
         gcn_readout='sum',
@@ -25,6 +27,7 @@ class MetaModel(torch.nn.Module):
         super().__init__()
         self.data_dir = data_dir
         self.embed_dim = embed_dim
+        self.num_bands = num_bands
         self.num_hyperplanes = num_hyperplanes
         self.gcn_layers = gcn_layers
         self.gcn_readout = gcn_readout
@@ -42,26 +45,36 @@ class MetaModel(torch.nn.Module):
                 self.embed_dim,
                 self.gcn_layers,
                 self.gcn_readout
-                ) for _ in range(self.num_hyperplanes)
-        ])
+                ) for _ in range(self.num_bands * self.num_hyperplanes)
+        ]) # TODO: find out how to share weights!
 
     def _build_embeddings(self):
         """
         Builds embeddings for both entities (including variables) and relations.
 
-        Embeddings for entities are stored in a dict of embeddings:
+        Embeddings for entities and variables are stored in a dict of embeddings:
         self.ent_features = {
-            'type1': nn.Embedding(num_ents, embed_dim),
-            'type2': nn.Embedding(num_ents, embed_dim),
+            'type_1': nn.Embedding(num_ents, embed_dim),
             ...
+            'type_n': nn.Embedding(num_ents, embed_dim)
         }
+        self.var_features = {
+            'type_1': nn.Embedding(1, embed_dim),
+            ...
+            'type_n': nn.Embedding(1, embed_dim)
+        }
+        We define self.node_maps as a mapping from global entity ID to typed entity ID.
 
         Embeddings for relations are stored directly as embedding:
         self.rel_features = nn.Embedding(num_rels, embed_dim)
+
+        We define self.rel_maps as a mapping from tuple (fr, r, to) to rel_id where
+        fr, r and to are strings.
         """
         
         # load data and statistics
         rels, _, node_maps = pickle.load(open(self.data_dir+"/graph_data.pkl", "rb"))
+        self.nodes_per_mode = node_maps
         node_mode_counts = {mode: len(node_maps[mode]) for mode in node_maps}
         num_nodes = sum(node_mode_counts.values())
         
@@ -124,4 +137,60 @@ class MetaModel(torch.nn.Module):
         self.embed_rels = _rel_lookup
 
     def forward(self, data: VectorizedQueryBatch) -> Tensor:
-        return torch.cat([gcn(data) for gcn in self.submodels], dim=1)
+        """
+        Forwards the query graph batch through the GCN submodels.
+        """
+        return torch.cat([gcn(data) for gcn in self.submodels], dim=1).reshape(
+            data.batch_size, self.num_bands, self.num_hyperplanes, -1)
+
+    def return_answers(self, hyp: Tensor) -> Sequence:
+        """
+        Returns answer set per batch item.
+        Used to compute metrics such as accuracy, precision and recall.
+        """
+        pass
+
+    def signature_loss(self, hyp: Tensor, y: Tensor) -> Tensor:
+        """
+        Calculates the distance between the preferred signature [1,1,..,1] 
+        and the signature of the entity.
+        """
+        # reshape y for calculating dot product
+        y = y.reshape(y.size(0), 1, 1, -1).expand(y.size(0), self.num_bands, self.num_hyperplanes, -1)
+        # calculate dot product with hyperplanes
+        dot = torch.mul(hyp, y).sum(dim=-1)
+        # get approximate signature using sigmoid function
+        s = torch.sigmoid(dot)
+        # calculate bucket-wise distance with perfect score [1, 1, ..., 1]
+        sign_distance = (self.num_hyperplanes - torch.sum(s, dim=-1))/self.num_hyperplanes
+        return sign_distance
+
+    def diversity_loss(self, hyp: Tensor) -> Tensor:
+        """
+        Calculates the diversity loss for a set of hyperplanes
+        """
+        return torch.Tensor(0)
+
+    def calc_loss(self, x: VectorizedQueryBatch, y: Tensor, y_neg: Tensor, return_answers: bool = False) -> Tuple[Tensor, List]:
+        hyp = self.forward(x)
+
+        d_true = self.signature_loss(hyp, y)
+        d_false = 1 - self.signature_loss(hyp, y_neg)
+
+        # only use loss for buckets that contain the answer
+        # if none contain the answer, we use all buckets.
+        indicator = torch.tensor(d_true.clone().detach() > .5).float()
+        indicator[(indicator == 0).all(dim=-1)] = 1
+        ind_sums = indicator.sum(dim=-1)
+        # we combine the bucket losses into an average loss instead of sum
+        loss_true = torch.mul(d_true, indicator).sum(dim=-1)/ind_sums
+        # and average over the batch size
+        loss_true = loss_true.mean()
+
+        # TODO: implement loss_false!
+        loss_false = 0
+
+        hyp_loss = self.diversity_loss(hyp)
+        loss = loss_true + loss_false + hyp_loss
+        answers = self.return_answers() if return_answers else [None]
+        return loss, answers

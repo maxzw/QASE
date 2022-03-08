@@ -1,6 +1,7 @@
 """Variables and functions needed for generating training batches."""
 
 import numpy as np
+import random
 from typing import Sequence, Tuple
 import torch
 from torch import Tensor
@@ -50,8 +51,14 @@ variable_node_idx = {'1-chain': [0],
                         '3-inter_chain': [0, 3]}
 
 
-def vectorize_batch(formula: Formula, queries: Sequence[Query],model: MetaModel) -> Tuple[VectorizedQueryBatch, Tensor]:
-    """Converts batch data with global IDs to embeddings."""
+def vectorize_batch(
+    formula: Formula,
+    queries: Sequence[Query],
+    model: MetaModel
+    ) -> Tuple[VectorizedQueryBatch, Tensor]:
+    """
+    Converts batch data with global IDs to embeddings.
+    """
     # general info
     batch_size = torch.tensor(len(queries))
     var_idx = variable_node_idx[formula.query_type]
@@ -79,12 +86,12 @@ def vectorize_batch(formula: Formula, queries: Sequence[Query],model: MetaModel)
     edge_type = edge_type.repeat(batch_size)
     
     # get entity embeddings
+    ent_e = torch.empty(batch_size, num_nodes, model.embed_dim)
     anchor_ids = np.empty([batch_size, num_anchors]).astype(int)
     # First rows of x contain embeddings of all anchor nodes
     for i, anchor_mode in enumerate(formula.anchor_modes):
         anchors = [q.anchor_nodes[i] for q in queries]
         anchor_ids[:, i] = anchors
-    ent_e = torch.empty(batch_size, num_nodes, model.embed_dim)
     for i, anchor_mode in enumerate(formula.anchor_modes):
         ent_e[:, i] = model.embed_ents(anchor_ids[:, i], anchor_mode)
     # all other rows contain variable embeddings
@@ -95,21 +102,30 @@ def vectorize_batch(formula: Formula, queries: Sequence[Query],model: MetaModel)
     # then we reshape to feature matrix shape
     ent_e = ent_e.reshape(-1, model.embed_dim)
 
-    # TODO: add all to device, but when?
     x = VectorizedQueryBatch(
-        batch_size=batch_size,
-        num_nodes=edge_data.num_nodes,
-        target_idx=target_idx,
-        batch_idx=batch_idx,
-        ent_e=ent_e,
-        edge_index=batch.edge_index,
-        edge_type=edge_type,
-        rel_e=edge_embs
+        batch_size  = batch_size.to(model.device),
+        num_nodes   = edge_data.num_nodes.to(model.device),
+        target_idx  = target_idx.to(model.device),
+        batch_idx   = batch_idx.to(model.device),
+        ent_e       = ent_e.to(model.device),
+        edge_index  = batch.edge_index.to(model.device),
+        edge_type   = edge_type.to(model.device),
+        rel_e       = edge_embs.to(model.device)
     )
 
     # get target node embeddings
-    target_nodes = [q.target_node for q in queries]
     target_mode = formula.target_mode
-    y = model.embed_ents(target_nodes, target_mode)
-    
-    return x, y
+    y_ids = torch.tensor([q.target_node for q in queries]).to(model.device)
+    y = model.embed_ents(y_ids, target_mode).to(model.device)
+
+    # get negative sample embeddings
+    if "inter" in formula.query_type: # sample hard negative IDs per query
+        neg_nodes = [random.choice(query.hard_neg_samples) for query in queries]
+    # 1-chain does not contain negative samples, we sample manually from target mode IDs
+    elif formula.query_type == "1-chain": 
+        neg_nodes = [random.choice(model.nodes_per_mode[formula.target_mode]) for _ in queries]
+    else:
+        neg_nodes = [random.choice(query.neg_samples) for query in queries]
+    y_neg = model.embed_ents(neg_nodes, target_mode).to(model.device)
+
+    return x, y_ids, y, y_neg

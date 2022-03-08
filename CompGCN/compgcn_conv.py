@@ -3,12 +3,13 @@ from CompGCN.message_passing import MessagePassing
 from torch_scatter import scatter_add
 
 class CompGCNConv(MessagePassing):
-	def __init__(self, in_channels, out_channels, use_bias=True, opn='sub', dropout=0):
+	def __init__(self, in_channels, out_channels, use_bias=True, use_bn=True, opn='sub', dropout=0):
 		super(self.__class__, self).__init__()
 
 		self.in_channels	= in_channels
 		self.out_channels	= out_channels
 		self.use_bias 		= use_bias
+		self.use_bn 		= use_bn
 		self.opn 			= opn
 		self.dropout 		= dropout
 		self.device			= None
@@ -20,10 +21,13 @@ class CompGCNConv(MessagePassing):
 		self.loop_rel 		= get_param((1, in_channels))
 
 		self.drop			= torch.nn.Dropout(self.dropout)
-		self.bn				= torch.nn.BatchNorm1d(out_channels)
 
 		if self.use_bias: 
 			self.register_parameter('bias', Parameter(torch.zeros(out_channels)))
+		
+		if self.use_bn:
+			self.bn = torch.nn.BatchNorm1d(out_channels)
+
 
 	def forward(self, x, edge_index, edge_type, rel_embed):
 		if self.device is None:
@@ -49,7 +53,8 @@ class CompGCNConv(MessagePassing):
 
 		if self.use_bias: 
 			out = out + self.bias
-		out = self.bn(out)
+		if self.use_bn:
+			out = self.bn(out)
 
 		return out, torch.matmul(rel_embed, self.w_rel)[:-1]		# Ignoring the self loop inserted
 
