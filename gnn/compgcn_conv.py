@@ -44,7 +44,7 @@ class CompGCNConv(MessagePassing):
 			self.bn = torch.nn.BatchNorm1d(out_channels)
 
 
-	def forward(self, ent_embed, rel_embed, edge_index, edge_type):
+	def forward(self, ent_embed, rel_embed, edge_index, edge_type, ent_mask=None):
 		"""
 		Message passing layer.
 
@@ -67,14 +67,14 @@ class CompGCNConv(MessagePassing):
 		if self.device is None:
 			self.device = edge_index.device
 
-		rel_embed = torch.cat([rel_embed, self.loop_rel], dim=0) # contains in, out and loop
-		num_edges = edge_index.size(1)
-		edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1) # add inverse relations to edge index
-		num_ent   = ent_embed.size(0)
+		rel_embed 	= torch.cat([rel_embed, self.loop_rel], dim=0) # contains in, out and loop
+		num_edges 	= edge_index.size(1)
+		edge_index	= torch.cat([edge_index, edge_index.flip(0)], dim=1) # add inverse relations to edge index
+		num_ent   	= ent_embed.size(0)
 
-		self.in_index 	= edge_index[:, :num_edges]	# indices of normal edges
-		self.out_index 	= edge_index[:, num_edges:]	# indices of inversed edges
-		self.in_type 	= edge_type					# original types
+		self.in_index 	= edge_index[:, :num_edges]				# indices of normal edges
+		self.out_index 	= edge_index[:, num_edges:]				# indices of inversed edges
+		self.in_type 	= edge_type								# original types
 		self.out_type	= edge_type + rel_embed.shape[0] // 2	# original types shifted by length of relation embeddings
 
 		self.loop_index	= torch.stack([torch.arange(num_ent), torch.arange(num_ent)]).to(self.device)
@@ -93,7 +93,10 @@ class CompGCNConv(MessagePassing):
 		if self.use_bn:
 			out = self.bn(out)
 
-		return out, torch.matmul(rel_embed, self.w_rel)[:-1]	# Ignoring the self loop inserted
+		if ent_mask is not None:
+			out[ent_mask] = ent_embed[ent_mask]
+
+		return out, torch.matmul(rel_embed, self.w_rel)[:-1]	# Ignoring the self loop inserted, which is the last index
 
 	def rel_transform(self, ent_embed, rel_embed):
 		if   self.opn == 'corr': 	trans_embed  = ccorr(ent_embed, rel_embed)

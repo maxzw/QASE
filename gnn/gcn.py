@@ -7,7 +7,7 @@ from torch_scatter import scatter_add, scatter_max
 
 from gnn.compgcn_conv import CompGCNConv
 from gnn.message_passing import MessagePassing
-from loader import QueryBatch
+from loader import VectorizedQueryBatch
 
 class GCNModel(nn.Module):
     def __init__(
@@ -15,10 +15,10 @@ class GCNModel(nn.Module):
         embed_dim,
         num_layers,
         readout,
-        device=None,
         use_bias=True,
         opn='corr',
-        dropout=0
+        dropout=0,
+        device=None
         ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -60,49 +60,23 @@ class GCNModel(nn.Module):
     def sum_readout(self, embs, batch_idx, **kwargs):
         return scatter_add(embs, batch_idx, dim=0)
 
-    def target_message_readout(self, embs, batch_size, num_nodes, target_id, **kwargs):
-        """
-        Returns the target node embedding.
+    def target_message_readout(self, embs, target_idx, **kwargs):
+        return embs[target_idx]
 
-        NOTE: The current implementation assumes all queries to have the same structure!
-
-        Args:
-            embs (Tensor): Shape (batch_size, num_nodes, embed_dim)
-                The node embeddings for all query graphs in the batch.
-            batch_size (Tensor): Shape (1)
-                The batch size (number of queries in the batch).
-            num_nodes (Tensor): Shape (1)
-                The number of nodes in a query.
-            target_id (Tensor): Shape (1)
-                The query-local node ID of the target node.
-
-        Returns:
-            Tensor: Shape (batch_size, embed_dim)
-                The target node embedding for each query.
-        """
-        device = embs.device
-
-        non_target_idx = torch.ones(num_nodes, dtype=torch.bool)
-        non_target_idx[target_id] = 0
-        non_target_idx.to(device)
-
-        embs = embs.reshape(batch_size, num_nodes, -1)
-        targets = embs[:, ~non_target_idx].reshape(batch_size, -1)
-
-        # alternative way, requires more preprocessing
-        # here target_idx needs to be purely the binary mask for target values: [1, 0, 0, 1, 0, 1, ...]
-        # targets = embs[target_idx]
-
-        return targets
-
-    def forward(self, data: QueryBatch) -> Tensor:
-
-        ent_embed, rel_embed = data.ent_embed, data.rel_embed
+    def forward(self, data: VectorizedQueryBatch) -> Tensor:
+        
+        ent_embed, rel_embed, diameters = data.ent_embed, data.rel_embed, data.q_diameters
 
         # perform message passing
+        convs = 1
         for layer in self.layers:
             if isinstance(layer, MessagePassing):
-                ent_embed, rel_embed = layer(ent_embed, rel_embed, data.edge_index, data.edge_type)
+                
+                # include binary mask for entities where conv step is > query diameter
+                ent_mask = torch.tensor((convs > diameters).float(), dtype=torch.long)
+                
+                ent_embed, rel_embed = layer(ent_embed, rel_embed, data.edge_index, data.edge_type, ent_mask=ent_mask)
+                convs += 1
             else:
                 ent_embed = layer(ent_embed)
 
@@ -110,8 +84,6 @@ class GCNModel(nn.Module):
         out = self.readout(
             embs        =   ent_embed,
             batch_idx   =   data.batch_idx,
-            batch_size  =   data.batch_size,
-            num_nodes   =   data.num_nodes,
             target_id   =   data.target_idx
             )
         return out

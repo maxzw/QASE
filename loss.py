@@ -1,23 +1,34 @@
 """Loss functions for hyperplane configurations."""
 from abc import abstractmethod
 
+import torch
 from torch import Tensor, nn
 
 class AnswerSpaceLoss(nn.Module):
     """A loss for answer space."""
 
-    @abstractmethod
+    def _signature_loss(self, hyp: Tensor, y: Tensor):
+        # reshape y for calculating dot product
+        y = y.reshape(y.size(0), 1, 1, -1).expand(y.size(0), hyp.size(1), hyp.size(2), -1)
+        # calculate dot product with hyperplanes
+        dot = torch.mul(hyp, y).sum(dim=-1)
+        # get approximate signature using sigmoid function
+        s = torch.sigmoid(dot)
+        # calculate band-wise distance with perfect score [1, 1, ..., 1]
+        sign_distance = (hyp.size(1) - torch.sum(s, dim=-1))/hyp.size(1)
+        return sign_distance
+
     def forward(
         self,
-        hyps: Tensor,
+        hyp: Tensor,
         pos_embeds: Tensor,
         neg_embeds: Tensor
-    ) -> Tensor:
+        ) -> Tensor:
         """
         Computes the loss for a collection of hyperplanes.
 
         Args:
-            hyps (Tensor): Shape (batch_size, num_bands, num_hyperplanes, embed_dim)
+            hyp (Tensor): Shape (batch_size, num_bands, num_hyperplanes, embed_dim)
                 A collection of hyperplanes grouped per band.
             pos_embeds (Tensor): Shape (batch_size, embed_dim)
                 The answer entity embeddings.
@@ -27,7 +38,11 @@ class AnswerSpaceLoss(nn.Module):
         Returns:
             Tensor: The loss value
         """
-        raise NotImplementedError
+        d_true = self._signature_loss(hyp, pos_embeds)
+        d_false = self._signature_loss(hyp, neg_embeds)
+
+        loss = d_true + (1- d_false)
+        return torch.mean(loss)
 
 """
 Loss ideas considering 1 entity, 1 band:
@@ -57,56 +72,3 @@ If multiple bands contain the answer, these bands get backpropagated.
 If no band contains the answer, all bands get backpropagated:
     - total_loss = band_loss_i + band_loss_i+1 + ... 
 """
-
-# def return_answers(self, hyp: Tensor) -> Sequence:
-#     """
-#     Returns answer set per batch item.
-#     Used to compute metrics such as accuracy, precision and recall.
-#     """
-#     pass
-
-# def signature_loss(self, hyp: Tensor, y: Tensor) -> Tensor:
-#     """
-#     Calculates the distance between the preferred signature [1,1,..,1] 
-#     and the signature of the entity.
-#     """
-#     # reshape y for calculating dot product
-#     y = y.reshape(y.size(0), 1, 1, -1).expand(y.size(0), self.num_bands, self.num_hyperplanes, -1)
-#     # calculate dot product with hyperplanes
-#     dot = torch.mul(hyp, y).sum(dim=-1)
-#     # get approximate signature using sigmoid function
-#     s = torch.sigmoid(dot)
-#     # calculate bucket-wise distance with perfect score [1, 1, ..., 1]
-#     sign_distance = (self.num_hyperplanes - torch.sum(s, dim=-1))/self.num_hyperplanes
-#     return sign_distance
-
-# def diversity_loss(self, hyp: Tensor) -> Tensor:
-#     """
-#     Calculates the diversity loss for a set of hyperplanes
-#     """
-#     return torch.Tensor(0)
-
-# def calc_loss(self, x: QueryBatch, y: Tensor, y_neg: Tensor, return_answers: bool = False) -> Tuple[Tensor, List]:
-#     hyp = self.forward(x)
-
-#     d_true = self.signature_loss(hyp, y)
-#     d_false = 1 - self.signature_loss(hyp, y_neg)
-
-#     # only use loss for buckets that contain the answer
-#     # if none contain the answer, we use all buckets.
-#     d_true_ = d_true.clone().detach()
-#     indicator = torch.tensor(d_true_ > .5).float()
-#     indicator[(indicator == 0).all(dim=-1)] = 1
-#     ind_sums = indicator.sum(dim=-1)
-#     # we combine the bucket losses into an average loss instead of sum
-#     loss_true = torch.mul(d_true, indicator).sum(dim=-1)/ind_sums
-#     # and average over the batch size
-#     loss_true = loss_true.mean()
-
-#     # TODO: implement loss_false!
-#     loss_false = 0
-
-#     hyp_loss = self.diversity_loss(hyp)
-#     loss = loss_true + loss_false + hyp_loss
-#     answers = self.return_answers() if return_answers else [None]
-#     return loss, answers

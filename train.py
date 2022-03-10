@@ -18,43 +18,46 @@ def _train_epoch(
     model.train()
     
     epoch_loss = torch.zeros(size=tuple(), device=model.device)
-    for batch, targets in dataloader:
+    
+    for x_data, y_data in dataloader:
+
         optimizer.zero_grad()
-        hyps = model(batch)
-        loss = loss_fn(hyps, targets.pos_embed, targets.neg_embed)
+        hyp = model(x_data)
+        pos_embs, neg_embs = model.embed_targets(y_data)
+        loss = loss_fn(hyp, pos_embs, neg_embs)
+        print(loss)
         loss.backward()
         optimizer.step()
-        epoch_loss += loss.detach() * batch.batch_size
-    return epoch_loss / len(dataloader)
+        epoch_loss += loss.item() * x_data.batch_size.item()
+
+    return epoch_loss
+
 
 def train(
     model,
-    data_loaders,
+    train_dataloader,
+    val_dataloader,
     loss_fn,
     optimizer,
     num_epochs,
     eval_freq,
     ):
     
-    train_data_loader = data_loaders["train"]
-    valid_data_loader = data_loaders["valid"]
-
     # training
     for epoch in range(num_epochs):
-        epoch_loss = _train_epoch(
+        losses = _train_epoch(
             model,
-            train_data_loader,
+            train_dataloader,
             loss_fn,
             optimizer
             )
-
+        print(losses)
         # validation
-        if (epoch + 1) % eval_freq == 0:
-            val_results = evaluate(
-                model,
-                valid_data_loader,
-                loss_fn
-            )
+        # if (epoch + 1) % eval_freq == 0:
+        #     val_results = evaluate(
+        #         model,
+        #         val_dataloader,
+        #         loss_fn
+        #     )
 
-    training_report = epoch_loss + val_results
-    return training_report
+    return None
