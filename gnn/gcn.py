@@ -68,15 +68,18 @@ class GCNModel(nn.Module):
         ent_embed, rel_embed, diameters = data.ent_embed, data.rel_embed, data.q_diameters
 
         # perform message passing
-        convs = 1
+        convs = 0
         for layer in self.layers:
+            
+            # convolution layer
             if isinstance(layer, MessagePassing):
                 
-                # include binary mask for entities where conv step is > query diameter
-                ent_mask = torch.tensor((convs > diameters).float(), dtype=torch.long)
-                
+                # include boolean mask for entities where query diameter <= conv step
+                ent_mask = torch.le(diameters, convs)
                 ent_embed, rel_embed = layer(ent_embed, rel_embed, data.edge_index, data.edge_type, ent_mask=ent_mask)
                 convs += 1
+            
+            # otherwise its activation function
             else:
                 ent_embed = layer(ent_embed)
 

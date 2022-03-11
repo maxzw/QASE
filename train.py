@@ -23,15 +23,16 @@ def _train_epoch(
     
     x: QueryBatch
     y: QueryTargetInfo
-    for x, y in dataloader:
+    for x_info, y_info in dataloader:
         
         optimizer.zero_grad()
-        hyp = model(x)
-        loss = loss_fn(hyp, y.pos_embed, y.neg_embed)
+        hyp = model(x_info)
+        pos_emb, neg_emb = model.embed_targets(y_info)
+        loss = loss_fn(hyp, pos_emb, neg_emb)
         print(loss)
         loss.backward()
         optimizer.step()
-        epoch_loss += loss.item() * x.batch_size.item()
+        epoch_loss += loss.item() * x_info.batch_size.item()
 
     return epoch_loss
 

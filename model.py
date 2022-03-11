@@ -74,7 +74,7 @@ class MetaModel(torch.nn.Module):
         }
         We define self.node_maps as a mapping from global entity ID to typed entity ID.
 
-        Embeddings for relations are stored directly as embedding:
+        Embeddings for relations are stored as embedding directly:
         self.rel_features = nn.Embedding(num_rels, embed_dim)
 
         We define self.rel_maps as a mapping from tuple (fr, r, to) to rel_id.
@@ -138,72 +138,64 @@ class MetaModel(torch.nn.Module):
         return self.var_features[mode](torch.tensor([0]))
 
 
-    def rel_str_to_id(self, rel: str) -> int:
-        return self.rel_maps[rel]
-
-
     def embed_rels(self, rel_types: Tensor) -> Tensor:
         return self.rel_features(rel_types)
 
 
     def vectorize_batch(self, batch: QueryBatch) -> VectorizedQueryBatch:
 
-        # embed entities and variables
+        # Embed entities and variables
         ent_embed = torch.empty((batch.ent_ids.size(0), self.embed_dim))
         for i, (id, mode) in enumerate(zip(batch.ent_ids, batch.ent_modes)):
-            if "var_" in mode:
-                emb = self.embed_vars(re.sub("var_", "", mode))
+            if id == -1: # means variable
+                emb = self.embed_vars(mode)
             else:
                 emb = self.embed_ents(mode, id)
             ent_embed[i] = emb
 
-        # embed relations
+        # Embed relations
         num_unique_edges = len(set(batch.edge_ids))
-        rel_embed = torch.empty((num_unique_edges, self.embed_dim))
+        reg_rel_embed = torch.empty((num_unique_edges, self.embed_dim))
         inv_rel_embed = torch.empty((num_unique_edges, self.embed_dim))
         edge_type = torch.empty((len(batch.edge_ids),), dtype=torch.int64)
         all_ids = []
         for i, id in enumerate(batch.edge_ids):
             if id not in all_ids:
-                # add to regular edges
-                rel_id = torch.tensor(self.rel_maps[id])
-                emb = self.embed_rels(rel_id)
-                rel_embed[len(all_ids)] = emb
+                # add to regular edges (stored as inverse initially)
+                reg_rel_embed[len(all_ids)] = self.embed_rels(
+                    torch.tensor(self.rel_maps[_reverse_relation(id)]))
                 # add to inverse edges
-                inv_rel_id = torch.tensor(self.rel_maps[_reverse_relation(id)])
-                inv_emb = self.embed_rels(inv_rel_id)
-                inv_rel_embed[len(all_ids)] = inv_emb
+                inv_rel_embed[len(all_ids)] = self.embed_rels(
+                    torch.tensor(self.rel_maps[id]))
                 # keep track of known edges
+                edge_type[i] = len(all_ids)
                 all_ids.append(id)
-                new_idx = all_ids.index(id)
-                edge_type[i] = new_idx
             else: # if we've already seen the edge, just refer to index
                 old_idx = all_ids.index(id)
                 edge_type[i] = old_idx
         
-        # combine regular + inverse edges
-        rel_embed = torch.cat((rel_embed, inv_rel_embed), dim=0)
+        # Combine regular + inverse edges
+        rel_embed = torch.cat((reg_rel_embed, inv_rel_embed), dim=0)
 
         assert ent_embed.size(0) == batch.target_idx.size(0)
         assert rel_embed.size(0)//2 == max(edge_type)+1
         assert num_unique_edges == len(all_ids)
         
-        data = VectorizedQueryBatch(
-            batch_size=batch.batch_size,
-            batch_idx=batch.batch_idx,
-            target_idx=batch.target_idx,
-            ent_embed=ent_embed,
-            rel_embed=rel_embed,
-            edge_index=batch.edge_index,
-            edge_type=edge_type,
-            q_diameters=batch.q_diameters
+        return VectorizedQueryBatch(
+            batch_size  = batch.batch_size.to(self.device),
+            batch_idx   = batch.batch_idx.to(self.device),
+            target_idx  = batch.target_idx.to(self.device),
+            ent_embed   = ent_embed.to(self.device),
+            rel_embed   = rel_embed.to(self.device),
+            edge_index  = batch.edge_index.to(self.device),
+            edge_type   = edge_type.to(self.device),
+            q_diameters = batch.q_diameters.to(self.device)
         )
-        return data
 
 
     def forward(self, x_batch: QueryBatch) -> Tensor:
         """
-        Forwards the query graph batch through the GCN submodels.
+        First embeds and then forwards the query graph batch through the GCN submodels.
 
         Args:
             data (QueryBatch):
@@ -213,7 +205,7 @@ class MetaModel(torch.nn.Module):
             Tensor: Shape (batch_size, num_bands, num_hyperplanes, embed_dim)
                 Collection of hyperplanes that demarcate the answer space.
         """
-        data = self.vectorize_batch(x_batch)
+        data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
 
         return torch.cat([gcn(data) for gcn in self.submodels], dim=1).reshape(
             data.batch_size, self.num_bands, self.num_hyperplanes, self.embed_dim)
@@ -223,13 +215,19 @@ class MetaModel(torch.nn.Module):
 
         pos_embs = torch.empty((len(y_batch.pos_ids), self.embed_dim))
         neg_embs = torch.empty((len(y_batch.pos_ids), self.embed_dim))
+        
         for i, (p_id, p_m, n_id) in enumerate(zip(y_batch.pos_ids, y_batch.pos_modes, y_batch.neg_ids)):
             pos_embs[i] = self.embed_ents(p_m, p_id)
-            if not n_id > 0: # no sample found, pick random embedding
-                neg_embs[i] = self.embed_ents(p_m, torch.tensor([random.choice(self.nodes_per_mode[p_m])], dtype=torch.long))
+            
+            # no sample found, pick random embedding form target type
+            if n_id == -1:
+                neg_embs[i] = self.embed_ents(p_m, torch.tensor(random.choice(self.nodes_per_mode[p_m])))
+            
             else:
                 neg_embs[i] = self.embed_ents(p_m, n_id)
+        
         return pos_embs, neg_embs
+
 
     def predict(self, hyp: Tensor) -> Sequence[Sequence[int]]:
         raise NotImplementedError

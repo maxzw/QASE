@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch_geometric.data import Data, Batch
 
 from data.data_utils import load_queries_by_formula, load_test_queries_by_formula
-from data.graph import Formula, _reverse_relation
+from data.graph import Formula, Query, _reverse_relation
 
 
 query_edge_indices = {'1-chain': [[0],
@@ -128,6 +128,7 @@ class CompGCNDataset(Dataset):
         neg_ids     = []
         q_types     = []
         
+        query: Query
         for q_i, query in enumerate(queries):
             form: Formula = query.formula            
 
@@ -147,18 +148,18 @@ class CompGCNDataset(Dataset):
             all_curr_nodes = form.get_nodes()
             for var_id in var_idx:
                 ent_ids += [-1]
-                ent_modes += [f"var_{all_curr_nodes[var_id]}"]
+                ent_modes += [all_curr_nodes[var_id]]
             
-            # target_idx is always last node, since we read query from anchors -> targets
+            # target_idx is always first node after the anchor nodes
             curr_target_idx = torch.zeros(num_nodes)
-            curr_target_idx[-1] = 1
+            curr_target_idx[num_anchors] = 1
             target_idx  = torch.cat((target_idx, curr_target_idx), dim=-1)
 
             # edge ids
             rels = form.get_rels()  
             rel_idx = query_edge_label_idx[form.query_type]
             for i in rel_idx:
-                edge_ids += [_reverse_relation(rels[i])]
+                edge_ids += [rels[i]]
 
             # edge index
             curr_edge_data = Data(edge_index=torch.tensor([query_edge_indices[form.query_type]], dtype=torch.int64))
@@ -171,9 +172,10 @@ class CompGCNDataset(Dataset):
             # get negative sample
             if "inter" in form.query_type: # sample hard negative IDs per query
                 neg_id = random.choice(query.hard_neg_samples)
-            # 1-chain does not contain negative samples, we sample manually from target mode IDs
+            # 1-chain does not contain negative samples, we sample manually later in the pipeline
             elif form.query_type == "1-chain": 
-                neg_id = np.nan
+                neg_id = -1
+            # otherwise we just use the provided samples
             else:
                 neg_id = random.choice(query.neg_samples)
             neg_ids += [neg_id]
@@ -249,5 +251,5 @@ def get_dataloader(
         shuffle     = shuffle,
         collate_fn  = dataset.collate_fn,
         pin_memory  = True,
-        num_workers = num_workers,
+        # num_workers = num_workers,
     )
