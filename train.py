@@ -3,8 +3,10 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 
 from evaluation import evaluate
+from loader import QueryBatch, QueryTargetInfo
 from loss import AnswerSpaceLoss
 from model import MetaModel
+
 
 def _train_epoch(
     model: MetaModel,
@@ -19,16 +21,17 @@ def _train_epoch(
     
     epoch_loss = torch.zeros(size=tuple(), device=model.device)
     
-    for x_data, y_data in dataloader:
-
+    x: QueryBatch
+    y: QueryTargetInfo
+    for x, y in dataloader:
+        
         optimizer.zero_grad()
-        hyp = model(x_data)
-        pos_embs, neg_embs = model.embed_targets(y_data)
-        loss = loss_fn(hyp, pos_embs, neg_embs)
+        hyp = model(x)
+        loss = loss_fn(hyp, y.pos_embed, y.neg_embed)
         print(loss)
         loss.backward()
         optimizer.step()
-        epoch_loss += loss.item() * x_data.batch_size.item()
+        epoch_loss += loss.item() * x.batch_size.item()
 
     return epoch_loss
 
@@ -52,6 +55,7 @@ def train(
             optimizer
             )
         print(losses)
+        
         # validation
         # if (epoch + 1) % eval_freq == 0:
         #     val_results = evaluate(

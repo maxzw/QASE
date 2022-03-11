@@ -249,5 +249,5 @@ def get_dataloader(
         shuffle     = shuffle,
         collate_fn  = dataset.collate_fn,
         pin_memory  = True,
-        # num_workers = num_workers,
+        num_workers = num_workers,
     )

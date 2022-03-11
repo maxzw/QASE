@@ -12,10 +12,10 @@ import random
 import os
 
 # added this to prevent error of pickling with multiprocessing
-import dill, multiprocessing
-dill.Pickler.dumps, dill.Pickler.loads = dill.dumps, dill.loads
-multiprocessing.reduction.ForkingPickler = dill.Pickler
-multiprocessing.reduction.dump = dill.dump
+# import dill, multiprocessing
+# dill.Pickler.dumps, dill.Pickler.loads = dill.dumps, dill.loads
+# multiprocessing.reduction.ForkingPickler = dill.Pickler
+# multiprocessing.reduction.dump = dill.dump
 
 from .graph import Graph, Query, _reverse_edge, _reverse_relation
 

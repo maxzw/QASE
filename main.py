@@ -20,26 +20,26 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 
     train_queries, train_info = get_queries(data_dir, split='train')
-    val_queries, val_info = get_queries(data_dir, split='val')
+    # val_queries, val_info = get_queries(data_dir, split='val')
     
     train_dataloader = get_dataloader(
         train_queries,
         batch_size = 50,
         shuffle=True,
-        num_workers=1
+        num_workers=2
         )
 
-    val_dataloader = get_dataloader(
-        train_queries,
-        batch_size = 50,
-        shuffle=False,
-        num_workers=1
-        )
+    # val_dataloader = get_dataloader(
+    #     train_queries,
+    #     batch_size = 50,
+    #     shuffle=False,
+    #     num_workers=1
+    #     )
     
     training_report = train(
         model=model,
         train_dataloader=train_dataloader,
-        val_dataloader=val_dataloader,
+        val_dataloader=None,
         loss_fn=loss_fn,
         optimizer=optimizer,
         num_epochs=num_epochs,
