@@ -1,36 +1,77 @@
-import torch
+"""Evaluation functions"""
+from pandas import DataFrame
+from tqdm import tqdm
+from torch.utils.data import DataLoader
 
-def get_predictions():
-    pass
+from loader import QueryBatchInfo, QueryTargetInfo
+from models import AnswerSpaceModel
 
-def classification_metrics():
-    pass
+
+class ClassificationReport:
+    """Collects and aggregates classification results for a single evaluation run"""
+    def __init__(self):
+        self.src = dict()
+
+    def include(self, results):
+        """Include new classification metrics in report"""
+        pass
+
+    def finalize(self):
+        """
+        Calculate mean metrics per query structure, and add
+        global mean and weighed statistics.
+        """
+        pass
+
+
+class ClassificationData:
+    """Collects and aggregates classification reports during the whole training process"""
+    def __init__(self):
+        self.src = DataFrame()
+
+    def include(self, results):
+        """Include new classification report in dataframe"""
+        pass
+
+
+def classification_metrics(
+    preds,
+    y_info
+    ):
+    """
+    Return classification results:
+    dict {
+        'structure_1': {
+            accuracy:   [q1, q2, q3, ...]
+            precision:  [q1, q2, q3, ...]
+            recall:     [q1, q2, q3, ...]
+        }
+        'structure_2': {
+            ...
+        }
+    }
+    """
+
 
 def evaluate(
-    model,
-    dataloader,
-    embedder
+    model: AnswerSpaceModel,
+    dataloader: DataLoader,
     ):
-
-    # put model in evalation mode
+    
+    # put the model in eval mode
     model.eval()
-    
-    report = {}
-    for batch, targets in dataloader:
 
-        # get hyperplanes
-        hyps = model(batch)
+    report = ClassificationReport()
 
-        # get predicted entity IDs with hyperplanes, embeddings and target modes
-        preds = get_predictions(hyps, embedder, targets.modes)
+    x_info: QueryBatchInfo
+    y_info: QueryTargetInfo
+    for x_info, y_info in tqdm(dataloader, desc="Evaluation", unit="batch", position=1, leave=False):
+        
+        hyp = model(x_info)
+        preds = model.predict(hyp)
+        results = classification_metrics(preds, y_info)
+        report.include(results)
 
-        # get classification metrics for each query type
-        results = classification_metrics(preds, targets.y_id, targets.q_type)
+    report.finalize()
+    return report.src
 
-        # update report with new results
-        report.update(results)
-    
-    # group batch results together
-    results = results
-    
-    return results

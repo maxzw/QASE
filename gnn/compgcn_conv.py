@@ -2,22 +2,20 @@ import torch
 from torch.nn import Parameter
 from torch_scatter import scatter_add
 
+from helper import get_param
 from gnn.message_passing import MessagePassing
-from helper import (
-	get_param,
-	ccorr
-)
+from gnn.composition import *
 
 
 class CompGCNConv(MessagePassing):
 	def __init__(
 		self,
-		in_channels,
-		out_channels,
-		use_bias=True,
-		use_bn=True,
-		opn='sub',
-		dropout=0
+		in_channels: int = 128,
+		out_channels: int = 128,
+		comp: str = 'mult',
+		use_bias: bool = True,
+		use_bn: bool = True,
+		dropout: float = 0.0
 		):
 		super(self.__class__, self).__init__()
 
@@ -25,7 +23,7 @@ class CompGCNConv(MessagePassing):
 		self.out_channels	= out_channels
 		self.use_bias 		= use_bias
 		self.use_bn 		= use_bn
-		self.opn 			= opn
+		self.comp_str 		= comp
 		self.dropout 		= dropout
 		self.device			= None
 
@@ -42,6 +40,21 @@ class CompGCNConv(MessagePassing):
 		
 		if self.use_bn:
 			self.bn = torch.nn.BatchNorm1d(out_channels)
+
+		if self.comp_str == 'sub':
+			self.comp = SubtractionComposition()
+		elif self.comp_str == 'mult':
+			self.comp = MultiplicationComposition()
+		elif self.comp_str == 'cmult':
+			self.comp = ComplexMultiplicationComposition()
+		elif self.comp_str == 'cconv':
+			self.comp = CircularConvolutionComposition()
+		elif self.comp_str == 'ccorr':
+			self.comp = CircularCorrelationComposition()
+		elif self.comp_str == 'crot':
+			self.comp = ComplexRotationComposition()
+		else:
+			raise NotImplementedError
 
 
 	def forward(self, ent_embed, rel_embed, edge_index, edge_type, ent_mask=None):
@@ -67,9 +80,9 @@ class CompGCNConv(MessagePassing):
 		if self.device is None:
 			self.device = edge_index.device
 
-		rel_embed 	= torch.cat([rel_embed, self.loop_rel], dim=0) # contains in, out and loop
+		rel_embed 	= torch.cat([rel_embed, self.loop_rel], dim=0) 			# contains in, out and loop
 		num_edges 	= edge_index.size(1)
-		edge_index	= torch.cat([edge_index, edge_index.flip(0)], dim=1) # add inverse relations to edge index
+		edge_index	= torch.cat([edge_index, edge_index.flip(0)], dim=1) 	# add inverse relations to edge index
 		num_ent   	= ent_embed.size(0)
 
 		self.in_index 	= edge_index[:, :num_edges]				# indices of normal edges
@@ -98,18 +111,11 @@ class CompGCNConv(MessagePassing):
 
 		return out, torch.matmul(rel_embed, self.w_rel)[:-1]	# Ignoring the self loop inserted, which is the last index
 
-	def rel_transform(self, ent_embed, rel_embed):
-		if   self.opn == 'corr': 	trans_embed  = ccorr(ent_embed, rel_embed)
-		elif self.opn == 'sub': 	trans_embed  = ent_embed - rel_embed
-		elif self.opn == 'mult': 	trans_embed  = ent_embed * rel_embed
-		else: raise NotImplementedError
-
-		return trans_embed
 
 	def message(self, x_j, edge_type, rel_embed, edge_norm, mode):
 		weight 	= getattr(self, 'w_{}'.format(mode))
 		rel_emb = torch.index_select(rel_embed, 0, edge_type)
-		xj_rel  = self.rel_transform(x_j, rel_emb)
+		xj_rel  = self.comp(x_j, rel_emb)
 		out	= torch.mm(xj_rel, weight)
 
 		return out if edge_norm is None else out * edge_norm.view(-1, 1)
@@ -118,12 +124,12 @@ class CompGCNConv(MessagePassing):
 		return aggr_out
 
 	def compute_norm(self, edge_index, num_ent):
-		row, col	= edge_index
+		row, col		= edge_index
 		edge_weight 	= torch.ones_like(row).float()
-		deg		= scatter_add( edge_weight, row, dim=0, dim_size=num_ent)	# Summing number of weights of the edges
-		deg_inv		= deg.pow(-0.5)							# D^{-0.5}
+		deg				= scatter_add(edge_weight, row, dim=0, dim_size=num_ent)	# Summing number of weights of the edges
+		deg_inv			= deg.pow(-0.5)												# D^{-0.5}
 		deg_inv[deg_inv	== float('inf')] = 0
-		norm		= deg_inv[row] * edge_weight * deg_inv[col]			# D^{-0.5}
+		norm			= deg_inv[row] * edge_weight * deg_inv[col]					# D^{-0.5}
 
 		return norm
 

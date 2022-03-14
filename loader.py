@@ -3,14 +3,13 @@
 from dataclasses import dataclass
 import random
 from typing import Sequence, Tuple
-import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset, DataLoader
 from torch_geometric.data import Data, Batch
 
 from data.data_utils import load_queries_by_formula, load_test_queries_by_formula
-from data.graph import Formula, Query, _reverse_relation
+from data.graph import Formula, Query
 
 
 query_edge_indices = {'1-chain': [[0],
@@ -54,7 +53,7 @@ variable_node_idx = {'1-chain': [0],
 
 
 @dataclass
-class QueryBatch:
+class QueryBatchInfo:
     """Class that holds query info of a batch."""
     batch_size: Tensor          # (1,). Size of the batch
     
@@ -193,7 +192,7 @@ class CompGCNDataset(Dataset):
         assert edge_index.size(1) == len(edge_ids)
         assert batch_size[0] == pos_ids.size(0) == len(pos_modes) == neg_ids.size(0) == len(q_types)
 
-        x = QueryBatch(
+        x = QueryBatchInfo(
             batch_size=batch_size,
             ent_ids=ent_ids,
             ent_modes=ent_modes,

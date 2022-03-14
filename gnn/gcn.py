@@ -3,41 +3,46 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch_scatter import scatter_add, scatter_max
 
+from loader import VectorizedQueryBatch
 from gnn.compgcn_conv import CompGCNConv
 from gnn.message_passing import MessagePassing
-from loader import VectorizedQueryBatch
+from gnn.pooling import *
+
 
 class GCNModel(nn.Module):
     def __init__(
         self,
-        embed_dim,
-        num_layers,
-        readout,
-        use_bias=True,
-        opn='corr',
-        dropout=0,
+        embed_dim: int = 128,
+        num_layers: int = 3,
+        stop_at_diameter: bool = True,
+        pool: str = 'max',
+        comp: str = 'mult',
+        use_bias: bool = True,
+        use_bn: bool = True,
+        dropout: float = 0.0,
         device=None
         ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_layers = num_layers
-        self.device = device
+        self.stop_at_diameter = stop_at_diameter
+        assert pool in ['max', 'sum', 'tm'], f"Readout function {pool} is not implemented."
+        self.pool_str = pool
+        assert comp in ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot'], f"Composition operation {comp} is not implemented."
+        self.comp_str = comp
         self.use_bias = use_bias
-        assert opn in ['corr', 'sub', 'mult'], f"Composition operation {opn} is not implemented."
-        self.opn = opn
         self.dropout = dropout
-        assert readout in ['max', 'sum', 'TM'], f"Readout function {readout} is not implemented."
-        self.readout_str = readout
+        self.device = device       
         
-        # create message passing layers
+        # create message passing layers (sharing weights)
         layers = []
         conv = CompGCNConv(
             self.embed_dim,
-            self.embed_dim, 
+            self.embed_dim,
+            comp=comp,
             use_bias=use_bias,
-            opn=opn,
+            use_bn=use_bn,
             dropout=dropout
             )
         for _ in range(num_layers - 1):
@@ -46,22 +51,15 @@ class GCNModel(nn.Module):
         self.layers = nn.ModuleList(layers)
 
         # define readout function
-        if readout == 'max':
-            self.readout = self.max_readout
-        elif readout == 'sum':
-            self.readout = self.sum_readout
-        elif readout == 'TM':
-            self.readout = self.target_message_readout
+        if pool == 'max':
+            self.pool = MaxGraphPooling()
+        elif pool == 'sum':
+            self.pool = SumGraphPooling()
+        elif pool == 'tm':
+            self.pool = TargetPooling()
+        else:
+            raise NotImplementedError
 
-    def max_readout(self, embs, batch_idx, **kwargs):
-        out, argmax = scatter_max(embs, batch_idx, dim=0)
-        return out
-
-    def sum_readout(self, embs, batch_idx, **kwargs):
-        return scatter_add(embs, batch_idx, dim=0)
-
-    def target_message_readout(self, embs, target_idx, **kwargs):
-        return embs[target_idx]
 
     def forward(self, data: VectorizedQueryBatch) -> Tensor:
         
@@ -75,7 +73,7 @@ class GCNModel(nn.Module):
             if isinstance(layer, MessagePassing):
                 
                 # include boolean mask for entities where query diameter <= conv step
-                ent_mask = torch.le(diameters, convs)
+                ent_mask = torch.le(diameters, convs) if self.stop_at_diameter else None
                 ent_embed, rel_embed = layer(ent_embed, rel_embed, data.edge_index, data.edge_type, ent_mask=ent_mask)
                 convs += 1
             
@@ -84,9 +82,9 @@ class GCNModel(nn.Module):
                 ent_embed = layer(ent_embed)
 
         # aggregate node embeddings
-        out = self.readout(
+        out = self.pool(
             embs        =   ent_embed,
             batch_idx   =   data.batch_idx,
-            target_id   =   data.target_idx
+            target_idx  =   data.target_idx
             )
         return out

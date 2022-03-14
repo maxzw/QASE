@@ -61,16 +61,16 @@ class MessagePassing(torch.nn.Module):
 		size = None
 		message_args = []
 		for arg in self.message_args:
-			if arg[-2:] == '_i':					# If arguments ends with _i then include indic
-				tmp  = kwargs[arg[:-2]]				# Take the front part of the variable | Mostly it will be 'x', 
+			if arg[-2:] == '_i':									# If arguments ends with _i then include indic
+				tmp  = kwargs[arg[:-2]]								# Take the front part of the variable | Mostly it will be 'x', 
 				size = tmp.size(0)
-				message_args.append(tmp[edge_index[0]])		# Lookup for head entities in edges
+				message_args.append(tmp[edge_index[0]])				# Lookup for head entities in edges
 			elif arg[-2:] == '_j':
-				tmp  = kwargs[arg[:-2]]				# tmp = kwargs['x']
+				tmp  = kwargs[arg[:-2]]								# tmp = kwargs['x']
 				size = tmp.size(0)
-				message_args.append(tmp[edge_index[1]])		# Lookup for tail entities in edges
+				message_args.append(tmp[edge_index[1]])				# Lookup for tail entities in edges
 			else:
-				message_args.append(kwargs[arg])		# Take things from kwargs
+				message_args.append(kwargs[arg])					# Take things from kwargs
 
 		update_args = [kwargs[arg] for arg in self.update_args]		# Take update args from kwargs
 
