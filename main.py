@@ -39,9 +39,9 @@ model = HypewiseGCN(
 loss_fn = AnswerSpaceLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 
-# only train on 1-chain queries for testing
+# only train on 1-chain queries, and test on 1- and 2-diameter queries
 train_queries, train_info = get_queries(model.data_dir, split='train', exclude=['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter'])
-val_queries, val_info = get_queries(model.data_dir, split='val')
+val_queries, val_info = get_queries(model.data_dir, split='val', exclude=['3-inter', '3-inter_chain', '3-chain_inter'])
 
 train_dataloader = get_dataloader(
     train_queries,

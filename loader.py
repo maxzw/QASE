@@ -75,6 +75,7 @@ class QueryTargetInfo:
     pos_modes: Sequence[str]    # (batch_size,). Modes of the target entities.
     neg_ids: Tensor             # (batch_size,). IDs of the negative samples, share same mode as real targets.
     q_types: Sequence[str]      # (batch_size,). Query structure: ['1-chain', '2-chain', ..., '3-inter_chain'].
+    target_nodes: Sequence      # (batch_size,). Nested list of target nodes (multiple answers to a query).
 
 
 @dataclass
@@ -122,10 +123,11 @@ class CompGCNDataset(Dataset):
         q_diameters     = torch.tensor([], dtype=torch.int64)
 
         # QueryTargetInfo variables
-        pos_ids     = []
-        pos_modes   = []
-        neg_ids     = []
-        q_types     = []
+        pos_ids         = []
+        pos_modes       = []
+        neg_ids         = []
+        q_types         = []
+        target_nodes    = []
         
         query: Query
         for q_i, query in enumerate(queries):
@@ -166,7 +168,8 @@ class CompGCNDataset(Dataset):
             edge_data_list.append(curr_edge_data)
 
             # --- collecting QueryTargetInfo data ---
-            pos_ids += [query.target_node]
+            # target nodes are converted to tuple during preprocessing, so we take first index
+            pos_ids += [query.target_node[0]]
             pos_modes += [form.target_mode]
             # get negative sample
             if "inter" in form.query_type: # sample hard negative IDs per query
@@ -179,6 +182,7 @@ class CompGCNDataset(Dataset):
                 neg_id = random.choice(query.neg_samples)
             neg_ids += [neg_id]
             q_types += [form.query_type]
+            target_nodes.append(query.target_node)
 
         # --- aggregation ---
         ent_ids = torch.tensor(ent_ids, dtype=torch.long)
@@ -188,9 +192,11 @@ class CompGCNDataset(Dataset):
         pyg_batch = Batch.from_data_list(edge_data_list)
         edge_index = pyg_batch.edge_index.reshape((2, -1))
 
-        assert ent_ids.size(0) == len(ent_modes) == batch_idx.size(0) == target_idx.size(0) == q_diameters.size(0)
+        assert ent_ids.size(0) == len(ent_modes) == batch_idx.size(0) == target_idx.size(0) \
+            == q_diameters.size(0)
         assert edge_index.size(1) == len(edge_ids)
-        assert batch_size[0] == pos_ids.size(0) == len(pos_modes) == neg_ids.size(0) == len(q_types)
+        assert batch_size[0] == pos_ids.size(0) == len(pos_modes) == neg_ids.size(0) \
+            == len(q_types) == len(target_nodes)
 
         x = QueryBatchInfo(
             batch_size=batch_size,
@@ -207,10 +213,38 @@ class CompGCNDataset(Dataset):
             pos_ids=pos_ids,
             pos_modes=pos_modes,
             neg_ids=neg_ids,
-            q_types=q_types
+            q_types=q_types,
+            target_nodes=target_nodes
         )
         
         return x, y
+
+
+def process_targets(queries, aggr=True):
+    out_queries = []
+    
+    q1: Query
+    for q1 in queries:
+
+        # change int to tuple if necessary
+        if type(q1.target_node) == int: q1.target_node = (q1.target_node,)
+        
+        if aggr:
+            q2: Query
+            for q2 in queries:
+                
+                # change int to tuple if necessary
+                if type(q2.target_node) == int: q2.target_node = (q2.target_node,)
+                
+                # if anchor nodes are equal and q2 contains initial target (first index) not in q1
+                if ((q1.anchor_nodes == q2.anchor_nodes) and (q2.target_node[0] not in q1.target_node)):
+                    
+                    # add the initial target to q1
+                    q1.target_node += (q2.target_node[0],)
+        
+        out_queries.append(q1)
+
+    return out_queries
 
 
 def get_queries(data_dir: str, split: str, exclude: Sequence[str] = []):
@@ -227,12 +261,24 @@ def get_queries(data_dir: str, split: str, exclude: Sequence[str] = []):
 
     out_queries = []
     info = {}
-    for structure, d in queries.items():
+    for structure, formulas in queries.items():
+
+        # exclude structures if needed
         if structure not in exclude:
             info[structure] = 0
-            for _form, queries in d.items():
-                out_queries += queries
-                info[structure] += len(queries)    
+            for _form, query_list in formulas.items():
+                
+                # query_list is an actual list of queries if _form is a Formula
+                if isinstance(_form, Formula):
+                    out_queries += process_targets(query_list, aggr=(split != 'train'))
+                    info[structure] += len(out_queries)
+                
+                # otherwise go down one more level:
+                # one_neg and full_neg queries contain extra nested layer
+                else:
+                    for _actual_form, actual_query_list in query_list.items():
+                        out_queries += process_targets(actual_query_list, aggr=(split != 'train'))
+                        info[structure] += len(out_queries)
 
     return out_queries, info
 

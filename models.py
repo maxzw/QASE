@@ -133,12 +133,17 @@ class AnswerSpaceModel(nn.Module):
         )
 
 
-    def embed_targets(self, y_batch: QueryTargetInfo) -> Tuple[Tensor, Tensor]:
+    def embed_targets(
+        self,
+        pos_ids: Tensor,
+        pos_modes: Sequence[str],
+        neg_ids: Tensor
+        ) -> Tuple[Tensor, Tensor]:
 
-        pos_embs = torch.empty((len(y_batch.pos_ids), self.embed_dim))
-        neg_embs = torch.empty((len(y_batch.pos_ids), self.embed_dim))
+        pos_embs = torch.empty((len(pos_ids), self.embed_dim))
+        neg_embs = torch.empty((len(pos_ids), self.embed_dim))
         
-        for i, (p_id, p_m, n_id) in enumerate(zip(y_batch.pos_ids, y_batch.pos_modes, y_batch.neg_ids)):
+        for i, (p_id, p_m, n_id) in enumerate(zip(pos_ids, pos_modes, neg_ids)):
             pos_embs[i] = self.embed_ents(p_id)
             
             # no sample found, pick random embedding form target type
@@ -151,7 +156,12 @@ class AnswerSpaceModel(nn.Module):
         return pos_embs, neg_embs
 
 
-    def predict(self, hyp: Tensor) -> Sequence[Sequence[int]]:
+    def predict(self, hyp: Tensor, modes: Sequence[str]) -> Sequence[Sequence[int]]:
+        """
+        Given a configuration of hyperplanes predict the entity IDs that are 
+        part of the answer. These entities are filtered for target mode.
+        """
+        # TODO: Implement prediction function that filters target modes!
         raise NotImplementedError
 
 

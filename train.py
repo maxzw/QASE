@@ -1,5 +1,6 @@
 """Training module"""
 import logging
+from sklearn.metrics import classification_report
 from tqdm import tqdm
 import torch
 from torch import Tensor
@@ -8,7 +9,7 @@ from torch.utils.data import DataLoader
 from models import AnswerSpaceModel
 from loader import QueryBatchInfo, QueryTargetInfo
 from loss import AnswerSpaceLoss
-from evaluation import ClassificationData, evaluate
+from evaluation import ClassificationReport, evaluate
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ def _train_epoch(
     # put the model in train mode
     model.train()
     
+    # keep track of total loss in this epoch
     epoch_loss = torch.zeros(size=tuple(), device=model.device)
     
     x_info: QueryBatchInfo
@@ -32,7 +34,7 @@ def _train_epoch(
         
         optimizer.zero_grad()
         hyp = model(x_info)
-        pos_emb, neg_emb = model.embed_targets(y_info)
+        pos_emb, neg_emb = model.embed_targets(y_info.pos_ids, y_info. pos_modes, y_info.neg_ids)
         loss = loss_fn(hyp, pos_emb, neg_emb)
         logger.info(f"Loss: {loss.item()}")
         loss.backward()
@@ -48,12 +50,12 @@ def train(
     loss_fn,
     optimizer,
     num_epochs,
-    val_dataloader=None,
-    val_freq=None,
+    val_dataloader,
+    val_freq,
     ):
 
     epoch_losses = []
-    classification_data = ClassificationData()
+    class_report = ClassificationReport()
     
     # training
     for epoch in tqdm(range(num_epochs), desc="Training", unit="Epoch", position=0):
@@ -67,11 +69,10 @@ def train(
 
         # evaluate every 'val_freq' epochs
         if (epoch + 1) % val_freq == 0:
-            eval_report = evaluate(
+            eval_results = evaluate(
                 model,
-                val_dataloader,
-                loss_fn
+                val_dataloader
             )
-            classification_data.include(eval_report)
+            class_report.include(eval_results)
 
-    return epoch_losses, classification_data
+    return epoch_losses, class_report
