@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import random
-from typing import Sequence, Tuple
+from typing import Mapping, Sequence, Tuple
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset, DataLoader
@@ -94,7 +94,6 @@ class VectorizedQueryBatch:
     edge_index: Tensor      # (2, num_edges). List of batch-local index pairs representing edges in query graph.
                             # Does not contain inverse edges, which are inferred in message passing locally.
     edge_type: Tensor       # (num_edges,). The batch-local relation ID for each edge, referring to edge_index.
-
 
 
 class CompGCNDataset(Dataset):
@@ -220,7 +219,22 @@ class CompGCNDataset(Dataset):
         return x, y
 
 
-def process_targets(queries, aggr=True):
+def process_targets(
+    queries: Sequence[Query],
+    aggr=True
+    ) -> Sequence[Query]:
+    """
+    Transforms the target nodes to tuple and combines them 
+    for similar queries iff aggr=True.
+
+    Args:
+        queries (Sequence[Query]): List of queries.
+        aggr (bool, optional): If targets of similar queries should be aggregated. 
+            Defaults to True.
+
+    Returns:
+        Sequence[Query]: List of processed queries.
+    """
     out_queries = []
     
     q1: Query
@@ -247,7 +261,22 @@ def process_targets(queries, aggr=True):
     return out_queries
 
 
-def get_queries(data_dir: str, split: str, exclude: Sequence[str] = []):
+def get_queries(
+    data_dir: str,
+    split: str,
+    exclude: Sequence[str] = []
+    ) -> Tuple[Sequence[Query], Mapping[str, int]]:
+    """Loads, preprocesses and returns a bag of queries.
+
+    Args:
+        data_dir (str): Data directory (e.g. './data/AIFB/processed/').
+        split (str): Which split should be loaded: ['train', 'val', 'test'].
+        exclude (Sequence[str], optional): Query structures that should be excluded from the output. 
+            Defaults to [].
+
+    Returns:
+        Tuple[Sequence[Query], Mapping[str, int]]: List of processed queries and query statistics.
+    """
     assert split in ['train', 'val', 'test']
 
     queries = load_queries_by_formula(data_dir + f"/{split}_edges.pkl")
@@ -256,6 +285,7 @@ def get_queries(data_dir: str, split: str, exclude: Sequence[str] = []):
             queries.update(load_queries_by_formula(data_dir + f"/{split}_queries_{i}.pkl"))
         else:
             i_queries = load_test_queries_by_formula(data_dir + f"/{split}_queries_{i}.pkl")
+            # NOTE: current framework does not track one_neg / full_neg queries
             queries["one_neg"].update(i_queries["one_neg"])
             queries["full_neg"].update(i_queries["full_neg"])
 
@@ -284,11 +314,22 @@ def get_queries(data_dir: str, split: str, exclude: Sequence[str] = []):
 
 
 def get_dataloader(
-    data,
-    batch_size,
-    num_workers,
-    shuffle,
-    ):
+    data: Sequence[Query],
+    batch_size: int,
+    shuffle: bool,
+    num_workers: int
+    ) -> DataLoader:
+    """Retrieves dataloader with list of queries.
+
+    Args:
+        data (Sequence[Query]): List of queries.
+        batch_size (int): Batch size.
+        num_workers (int): Number of workers.
+        shuffle (bool): If the data should be shuffled (only needed for training).
+
+    Returns:
+        DataLoader: Dataloader that iterates through the query batches.
+    """
     dataset = CompGCNDataset(data)
     return DataLoader(
         dataset     = dataset,
@@ -296,5 +337,5 @@ def get_dataloader(
         shuffle     = shuffle,
         collate_fn  = dataset.collate_fn,
         pin_memory  = True,
-        # num_workers = num_workers,
+        # num_workers = num_workers, # this does not work with W10 at the moment...
     )

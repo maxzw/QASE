@@ -1,6 +1,5 @@
 """Training module"""
 import logging
-from sklearn.metrics import classification_report
 from tqdm import tqdm
 import torch
 from torch import Tensor
@@ -35,8 +34,7 @@ def _train_epoch(
         optimizer.zero_grad()
         hyp = model(x_info)
         pos_emb, neg_emb = model.embed_targets(y_info.pos_ids, y_info. pos_modes, y_info.neg_ids)
-        loss = loss_fn(hyp, pos_emb, neg_emb)
-        logger.info(f"Loss: {loss.item()}")
+        loss: Tensor = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
         epoch_loss += loss.item() * x_info.batch_size.item()
@@ -45,19 +43,22 @@ def _train_epoch(
 
 
 def train(
-    model,
-    train_dataloader,
-    loss_fn,
-    optimizer,
-    num_epochs,
-    val_dataloader,
-    val_freq,
+    model: AnswerSpaceModel,
+    train_dataloader: DataLoader,
+    loss_fn: AnswerSpaceLoss,
+    optimizer: torch.optim.Optimizer,
+    num_epochs: int,
+    val_dataloader: DataLoader,
+    val_freq: int,
     ):
 
+    # keep track of total loss during training
     epoch_losses = []
-    class_report = ClassificationReport()
+
+    # keep track of classification statistics during training
+    val_report = ClassificationReport()
     
-    # training
+    # train
     for epoch in tqdm(range(num_epochs), desc="Training", unit="Epoch", position=0):
         epoch_loss = _train_epoch(
             model,
@@ -65,14 +66,16 @@ def train(
             loss_fn,
             optimizer
             )
+        logger.info(f"Epoch loss: {epoch_loss}")
         epoch_losses.append(epoch_loss)
 
-        # evaluate every 'val_freq' epochs
+        # evaluate
         if (epoch + 1) % val_freq == 0:
-            eval_results = evaluate(
+            val_results = evaluate(
                 model,
                 val_dataloader
             )
-            class_report.include(eval_results)
+            logger.info(val_results)
+            val_report.include(val_results, {'epoch': epoch})
 
-    return epoch_losses, class_report
+    return epoch_losses, val_report.src

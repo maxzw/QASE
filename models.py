@@ -11,7 +11,7 @@ from torch import Tensor
 
 from data.graph import _reverse_relation
 from gnn.gcn import GCNModel
-from loader import QueryBatchInfo, QueryTargetInfo, VectorizedQueryBatch
+from loader import QueryBatchInfo, VectorizedQueryBatch
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +41,10 @@ class AnswerSpaceModel(nn.Module):
         rels, _, node_maps = pickle.load(open(self.data_dir+"/graph_data.pkl", "rb"))
         self.nodes_per_mode = node_maps
         node_mode_counts = {mode: len(node_maps[mode]) for mode in node_maps}
-        num_nodes = sum(node_mode_counts.values())
+        self.num_nodes = sum(node_mode_counts.values())
 
         # create entity and variable embeddings
-        self.ent_features = nn.Embedding(num_nodes, self.embed_dim)
+        self.ent_features = nn.Embedding(self.num_nodes, self.embed_dim)
         self.ent_features.weight.data.normal_(0, 1./self.embed_dim)
         logger.info(f"Created entity embeddings: {self.ent_features}")
         self.var_features = nn.Embedding(len(node_maps), self.embed_dim)
@@ -85,6 +85,14 @@ class AnswerSpaceModel(nn.Module):
 
 
     def vectorize_batch(self, batch: QueryBatchInfo) -> VectorizedQueryBatch:
+        """Vectorizes batch by converting QueryBatchInfo to VectorizedQueryBatch object.
+
+        Args:
+            batch (QueryBatchInfo): Non-vectorized batch information.
+
+        Returns:
+            VectorizedQueryBatch: Vectorized batch information.
+        """
 
         # Embed entities and variables
         ent_embed = torch.empty((batch.ent_ids.size(0), self.embed_dim))
@@ -139,6 +147,18 @@ class AnswerSpaceModel(nn.Module):
         pos_modes: Sequence[str],
         neg_ids: Tensor
         ) -> Tuple[Tensor, Tensor]:
+        """Returns embeddings for both the positive and negative targets of a query.
+
+        Args:
+            pos_ids (Tensor): Positive samples for the queries.
+            pos_modes (Sequence[str]): The modes of the positive target, used for sampling if
+                no negative sample is present.
+            neg_ids (Tensor): Negative samples for the queries.
+
+        Returns:
+            Tuple[Tensor, Tensor]: Returns output tensors of shape (batch_size, embed_dim),
+                one for both the positive and negative entities.
+        """
 
         pos_embs = torch.empty((len(pos_ids), self.embed_dim))
         neg_embs = torch.empty((len(pos_ids), self.embed_dim))
@@ -156,13 +176,68 @@ class AnswerSpaceModel(nn.Module):
         return pos_embs, neg_embs
 
 
-    def predict(self, hyp: Tensor, modes: Sequence[str]) -> Sequence[Sequence[int]]:
+    def predict(
+        self,
+        hyp: Tensor,
+        modes: Sequence[str]
+        ) -> Sequence[Sequence[int]]:
         """
         Given a configuration of hyperplanes predict the entity IDs that are 
         part of the answer. These entities are filtered for target mode.
+
+        Args:
+            hyp (Tensor): Shape (batch_size, num_bands, band_size, embed_dim).
+                The hyperplanes outputted by the model.
+            modes (Sequence[str]): Shape (batch_size,).
+                The modes belonging to the target nodes, used for filtering.
+
+        Returns:
+            Sequence[Sequence[int]]: Nested list of predicted answer entities per batch.
         """
-        # TODO: Implement prediction function that filters target modes!
-        raise NotImplementedError
+        answers = [[] for _ in range(len(modes))]
+
+        # TODO: speed this up (GPU)!
+        with torch.no_grad():
+
+            # transform hyperplanes:
+            # from  (batch_size, num_bands, band_size, embed_dim)
+            # to    (batch_size, num_ents, num_bands, band_size, embed_dim)
+            hyp_1 = hyp.reshape(hyp.size(0), 1, hyp.size(1), hyp.size(2), hyp.size(3))\
+                .expand(-1, self.num_nodes, -1, -1, -1)
+            
+            # transform embeddings:
+            # from  (num_ents, embed_dim)
+            # to    (batch_size, num_ents, num_bands, band_size, embed_dim)
+            emb = self.ent_features.weight
+            emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))\
+                .expand(hyp.size(0), -1, hyp.size(1), hyp.size(2), -1)
+
+            # calculate dot products of hyperplanes-embeddings
+            # and convert positive/negative dot products to binary values
+            # shape: (batch_size, num_ents, num_bands, band_size)
+            dot_inds = (torch.sum(hyp_1 * emb_1, dim=-1) > 0).float()
+
+            # get sum of positive-side indicators, if sum == num_bands, 
+            # all hyperplanes are positive and the band contains the answer
+            # shape: (batch_size, num_ents, num_bands)
+            band_inds = (dot_inds.sum(dim=-1) == dot_inds.size(3)).float()
+
+            # get sum of bands that contain the answer,
+            # if any band contains the entity, then the entity is a predicted answer
+            # shape: (batch_size, num_ents)
+            ent_inds = (band_inds.sum(dim=-1) > 0).float()
+
+            # iterate through all batches
+            for batch_idx, batch in enumerate(ent_inds):
+                # for all entities for that batch
+                for ent_idx, ent_ind in enumerate(batch):
+                    # if the entity indicator is 1 (is in any band) and 
+                    # entity index (=ID) is of correct type
+                    if (ent_ind == 1) and (ent_idx in self.nodes_per_mode[modes[batch_idx]]):
+                        # we add the entity index (=ID) to the answer list for that batch
+                        answers[batch_idx].append(ent_idx)
+        
+        return answers
 
 
     @abstractmethod
@@ -242,11 +317,7 @@ class HypewiseGCN(AnswerSpaceModel):
 
         
 class BandwiseGCN(AnswerSpaceModel):
-    """Uses one GCN for every band
-    
-    NOTE: If we implement this model we need bigger output dimensions of the CompGCN models.
-    This is a problem when using dynamic passing steps as entities will not share same dimensions!
-    """
+    """Uses one GCN for every band"""
     pass
 
 

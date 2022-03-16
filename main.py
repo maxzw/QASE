@@ -1,11 +1,14 @@
-from datetime import datetime
+"""Main script"""
 import logging
+from datetime import datetime
 
 from helper import TqdmLoggingHandler
 from loss import AnswerSpaceLoss
 from models import HypewiseGCN
 from loader import *
 from train import train
+from evaluation import evaluate
+
 
 # set log level
 save_logs = True
@@ -39,25 +42,17 @@ model = HypewiseGCN(
 loss_fn = AnswerSpaceLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 
-# only train on 1-chain queries, and test on 1- and 2-diameter queries
-train_queries, train_info = get_queries(model.data_dir, split='train', exclude=['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter'])
-val_queries, val_info = get_queries(model.data_dir, split='val', exclude=['3-inter', '3-inter_chain', '3-chain_inter'])
+# only train and test on 1-chain queries
+exclude = ['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter']
+train_queries, train_info = get_queries(model.data_dir, split='train', exclude=exclude)
+val_queries, val_info = get_queries(model.data_dir, split='val', exclude=exclude)
+test_queries, val_info = get_queries(model.data_dir, split='test', exclude=exclude)
 
-train_dataloader = get_dataloader(
-    train_queries,
-    batch_size = 50,
-    shuffle=True,
-    num_workers=2
-    )
+train_dataloader = get_dataloader(train_queries, batch_size = 50, shuffle=True, num_workers=2)
+val_dataloader = get_dataloader(val_queries, batch_size = 50, shuffle=False, num_workers=2)
+test_dataloader = get_dataloader(test_queries, batch_size = 50, shuffle=False, num_workers=2)
 
-val_dataloader = get_dataloader(
-    val_queries,
-    batch_size = 50,
-    shuffle=False,
-    num_workers=2
-    )
-
-epoch_losses, classification_data = train(
+epoch_losses, val_report = train(
     model=model,
     train_dataloader=train_dataloader,
     loss_fn=loss_fn,
@@ -67,4 +62,8 @@ epoch_losses, classification_data = train(
     val_freq=1
 )
 
-print(epoch_losses)
+test_report = evaluate(model, test_dataloader)
+
+logging.info(epoch_losses)
+logging.info(val_report)
+logging.info(test_report)

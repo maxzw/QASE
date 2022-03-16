@@ -1,5 +1,6 @@
 """Evaluation functions"""
 from collections import defaultdict
+import logging
 from typing import Mapping, Sequence
 import numpy as np
 from pandas import DataFrame
@@ -9,25 +10,61 @@ from torch.utils.data import DataLoader
 from loader import QueryBatchInfo, QueryTargetInfo
 from models import AnswerSpaceModel
 
+logger = logging.getLogger(__name__)
+
 
 class ClassificationReport:
     """Collects and aggregates classification reports during the whole training process"""
     def __init__(self):
         self.src = DataFrame()
 
-    def include(self, results):
-        """Include new classification report in dataframe"""
-        pass
+    def flatten_dict(self, data: Mapping[str, Mapping[str, float]]):
+        """
+        Concatenates the keys in the nested input dict.
+
+        Args:
+            data (Mapping[str, Mapping[str, float]]): 
+                See ClassificationData.finalize() for details.
+
+        Returns:
+            Dict to be included in the dataframe:
+                dict { 
+                    'structure_1_acc': float,
+                    'structure_1_pre': float,
+                    'structure_1_rec': float,
+                    ...
+                    'structure_n_acc': float,
+                    'structure_n_pre': float,
+                    'structure_n_rec': float,
+                    'macro_acc': float,
+                    ...
+                    'weighted_rec': float,
+                }
+        """
+        out_dict = {}
+        for structure, metrics in data.items():
+            for metric, value in metrics.items():
+                out_dict[f"{structure}_{metric}"] = value
+        return out_dict
+
+    def include(self, data: dict, ref_index: dict):
+        """Include the evaluation data in dataframe.
+
+        Args:
+            data (dict): See ClassificationData.finalize() for details.
+            ref_index (dict): A reference index ('unit': index) used for plotting.
+        """
+        self.src = self.src.append({**ref_index, **self.flatten_dict(data)}, ignore_index=True)
 
 
 class ClassificationData:
     """Collects and aggregates classification results for a single evaluation run"""
     def __init__(self):
-        self.src = None
+        self.src = {}
 
     def include(self, results):
         """Include new classification metrics in report (see classification_metrics)"""
-        if self.src == None:
+        if not self.src:
             self.src = results
         else:
             for structure, metrics in results.items():
@@ -36,8 +73,8 @@ class ClassificationData:
 
     def finalize(self):
         """
-        Calculate mean metrics per query structure, and add
-        global regular and weighed mean per metric.
+        Calculate mean metrics per query structure, add global macro-,
+        weighted-average and f1-score per metric and return resulting dictionary.
 
         Returns:
             dict {
@@ -49,18 +86,21 @@ class ClassificationData:
                 'structure_2': {
                     ...
                 },
-                'mean': {
+                'macro': {
                     acc:    float
                     pre:    float
                     rec:    float                
                 },
-                'weighed': {
+                'weighted': {
                     acc:    float
                     pre:    float
                     rec:    float
                 }
             }
         """
+        if not self.src:
+            return self.src
+
         global_accuracy_m = []
         global_precision_m = []
         global_recall_m = []
@@ -70,24 +110,34 @@ class ClassificationData:
         global_recall_w = []
 
         for structure, metrics in self.src.items():
-            # add raw values to weighed mean lists
+            # add raw values to weighted mean lists
             global_accuracy_w += metrics['acc']
             global_precision_w += metrics['pre']
             global_recall_w += metrics['rec']
             for metric, values in metrics.items():
                 self.src[structure][metric] = np.mean(values)
-            # add means to regular mean lists
-            global_accuracy_m += metrics['acc']
-            global_precision_m += metrics['pre']
-            global_recall_m += metrics['rec']
+            # add structure-specific f1-score
+            self.src[structure]['f1'] = 2*(
+                (self.src[structure]['pre']*self.src[structure]['rec'])
+                /(self.src[structure]['pre']+self.src[structure]['rec']))
+            # add [means] to regular mean lists
+            global_accuracy_m += [metrics['acc']]
+            global_precision_m += [metrics['pre']]
+            global_recall_m += [metrics['rec']]
     
-        self.src['mean']['acc'] = np.mean(global_accuracy_m)
-        self.src['mean']['pre'] = np.mean(global_precision_m)
-        self.src['mean']['rec'] = np.mean(global_recall_m)
+        self.src['macro']['acc'] = np.mean(global_accuracy_m)
+        self.src['macro']['pre'] = np.mean(global_precision_m)
+        self.src['macro']['rec'] = np.mean(global_recall_m)
+        self.src['macro']['f1'] = 2*(
+            (self.src['macro']['pre']*self.src['macro']['rec'])
+            /(self.src['macro']['pre']+self.src['macro']['rec']))
 
-        self.src['weighed']['acc'] = np.mean(global_accuracy_w)
-        self.src['weighed']['pre'] = np.mean(global_precision_w)
-        self.src['weighed']['rec'] = np.mean(global_recall_w)
+        self.src['weighted']['acc'] = np.mean(global_accuracy_w)
+        self.src['weighted']['pre'] = np.mean(global_precision_w)
+        self.src['weighted']['rec'] = np.mean(global_recall_w)
+        self.src['weighted']['f1'] = 2*(
+             (self.src['weighted']['pre']*self.src['weighted']['rec'])
+            /(self.src['weighted']['pre']+self.src['weighted']['rec']))
 
         return self.src
 
@@ -126,18 +176,18 @@ def classification_metrics(
             }
         }
     """
-    results = defaultdict(defaultdict(list))
+    results = defaultdict(lambda: defaultdict(list))
     
     for pred_nodes, true_nodes, mode, q_type in zip(preds, trues, modes, q_types):
         
         tp = len([n for n in pred_nodes if n in true_nodes])
-        tn = len(nodes_per_mode[mode]) - len(set(pred_nodes + true_nodes))
+        tn = len(nodes_per_mode[mode]) - len(set(list(pred_nodes) + list(true_nodes)))
         fp = len([n for n in pred_nodes if n not in true_nodes])
         fn = len([n for n in true_nodes if n in pred_nodes])
         
-        accuracy = (tp + tn)/(tp + tn + fp + fn)
-        precision = tp / (tp + fp)
-        recall = tp / (tp + fn)
+        accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
 
         results[q_type]['acc'] += [accuracy]
         results[q_type]['pre'] += [precision]
@@ -154,11 +204,12 @@ def evaluate(
     # put the model in eval mode
     model.eval()
 
+    # track classification metrics during eval run
     classif_data = ClassificationData()
 
     x_info: QueryBatchInfo
     y_info: QueryTargetInfo
-    for x_info, y_info in tqdm(dataloader, desc="Evaluation", unit="batch", position=1, leave=False):
+    for x_info, y_info in tqdm(dataloader, desc="Evaluate", unit="batch", position=1, leave=False):
         
         hyp = model(x_info)
         preds = model.predict(hyp, y_info.pos_modes)
@@ -170,5 +221,5 @@ def evaluate(
             y_info.q_types,
             )
         classif_data.include(results)
-    
+
     return classif_data.finalize()
