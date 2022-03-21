@@ -41,7 +41,7 @@ class CompGCNConv(MessagePassing):
 			# self.register_parameter('bias', Parameter(torch.zeros(out_channels)))
 		
 		if self.use_bn:
-			self.bn = torch.nn.BatchNorm1d(out_channels).to(self.device)
+			self.bn = torch.nn.BatchNorm1d(out_channels)
 
 		if self.comp_str == 'sub':
 			self.comp = SubtractionComposition()
