@@ -210,7 +210,7 @@ class AnswerSpaceModel(nn.Module):
             # add extra dimension for broadcasting:  
             # from  (num_ents, embed_dim)
             # to    (1, num_ents, 1, 1, embed_dim)
-            emb = self.ent_features.weight
+            emb = self.ent_features.weight.to(self.device)
             emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))
 
             # calculate dot products of hyperplanes-embeddings
