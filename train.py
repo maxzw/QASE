@@ -26,8 +26,6 @@ def _train_epoch(
     
     # keep track of total loss in this epoch
     batch_losses = []
-
-    # (temporary)
     pos_distances = []
     neg_distances = []
     
@@ -41,9 +39,10 @@ def _train_epoch(
         loss, pos_d, neg_d = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
-        batch_losses += [loss.detach().item()]
-        pos_distances += [pos_d.item()]
-        neg_distances += [neg_d.item()]
+
+        batch_losses.append(loss.detach().item())
+        pos_distances.append(pos_d.item())
+        neg_distances.append(neg_d.item())
 
     mean_loss = torch.mean(torch.tensor(batch_losses)).item()
     mean_loss_p = torch.mean(torch.tensor(pos_distances)).item()

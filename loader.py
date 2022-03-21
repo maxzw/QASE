@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import random
-from typing import Mapping, Sequence, Tuple
+from typing import Mapping, Optional, Sequence, Tuple
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset, DataLoader
@@ -142,13 +142,13 @@ class CompGCNDataset(Dataset):
 
             # first rows of entities contain embeddings of all anchor nodes
             for n, m in zip(query.anchor_nodes, form.anchor_modes):
-                ent_ids     += [n]
-                ent_modes   += [m]
+                ent_ids.append(n)
+                ent_modes.append(m)
             # all other rows contain variable embeddings
             all_curr_nodes = form.get_nodes()
             for var_id in var_idx:
-                ent_ids += [-1]
-                ent_modes += [all_curr_nodes[var_id]]
+                ent_ids.append(-1)
+                ent_modes.append(all_curr_nodes[var_id])
             
             # target_idx is always first node after the anchor nodes
             curr_target_idx = torch.zeros(num_nodes)
@@ -159,7 +159,7 @@ class CompGCNDataset(Dataset):
             rels = form.get_rels()  
             rel_idx = query_edge_label_idx[form.query_type]
             for i in rel_idx:
-                edge_ids += [rels[i]]
+                edge_ids.append(rels[i])
 
             # edge index
             curr_edge_data = Data(edge_index=torch.tensor([query_edge_indices[form.query_type]], dtype=torch.int64))
@@ -168,9 +168,9 @@ class CompGCNDataset(Dataset):
 
             # --- collecting QueryTargetInfo data ---
             # target nodes are converted to tuple during preprocessing, so we take first index
-            pos_ids += [query.target_node[0]]
+            pos_ids.append(query.target_node[0])
             target_nodes.append(query.target_node)
-            pos_modes += [form.target_mode]
+            pos_modes.append(form.target_mode)
             # get negative sample
             if "inter" in form.query_type: # sample hard negative IDs per query
                 neg_id = random.choice(query.hard_neg_samples)
@@ -180,8 +180,8 @@ class CompGCNDataset(Dataset):
             # otherwise we just use the provided samples
             else:
                 neg_id = random.choice(query.neg_samples)
-            neg_ids += [neg_id]
-            q_types += [form.query_type]
+            neg_ids.append(neg_id)
+            q_types.append(form.query_type)
 
         # --- aggregation ---
         ent_ids = torch.tensor(ent_ids, dtype=torch.long)
@@ -264,7 +264,7 @@ def process_targets(
 def get_queries(
     data_dir: str,
     split: str,
-    exclude: Sequence[str] = []
+    exclude: Optional[Sequence[str]] = []
     ) -> Tuple[Sequence[Query], Mapping[str, int]]:
     """Loads, preprocesses and returns a bag of queries.
 
