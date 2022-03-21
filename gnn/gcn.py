@@ -1,5 +1,6 @@
 """GCN model implementation using composition-based convolution."""
 
+from functools import partial 
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -21,33 +22,42 @@ class GCNModel(nn.Module):
         use_bias: bool = True,
         use_bn: bool = True,
         dropout: float = 0.0,
+        share_weights: bool = True,
         device=None
         ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_layers = num_layers
         self.stop_at_diameter = stop_at_diameter
-        assert pool in ['max', 'sum', 'tm'], f"Readout function {pool} is not implemented."
+        assert pool in ['max', 'sum', 'tm'], \
+            f"Readout function {pool} is not implemented."
         self.pool_str = pool
-        assert comp in ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot'], f"Composition operation {comp} is not implemented."
-        self.comp_str = comp
+        assert comp in ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot'], \
+            f"Composition operation {comp} is not implemented."
+        self.comp = comp
         self.use_bias = use_bias
+        self.use_bn = use_bn
         self.dropout = dropout
+        self.share_weights = share_weights
         self.device = device       
         
-        # create message passing layers (sharing weights)
+        # create message passing layers
         layers = []
-        conv = CompGCNConv(
-            self.embed_dim,
-            self.embed_dim,
-            comp=comp,
-            use_bias=use_bias,
-            use_bn=use_bn,
-            dropout=dropout
-            )
+        model_args = {
+            'in_channels': self.embed_dim,
+            'out_channels': self.embed_dim,
+            'comp': self.comp,
+            'use_bias': self.use_bias,
+            'use_bn': self.use_bn,
+            'dropout': self.dropout
+            }
+        # if we share weights we define the model once, otherwise we define it upon call with partial
+        conv = CompGCNConv(**model_args) if self.share_weights else partial(CompGCNConv, **model_args)
         for _ in range(num_layers - 1):
-            layers += [conv, nn.ReLU()]
-        layers += [conv]
+            layers += [
+                conv if self.share_weights else conv(),
+                nn.ReLU()]
+        layers += [conv if self.share_weights else conv()]
         self.layers = nn.ModuleList(layers)
 
         # define readout function
