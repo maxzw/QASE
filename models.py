@@ -177,7 +177,7 @@ class AnswerSpaceModel(nn.Module):
             else:
                 neg_embs[i] = self.embed_ents(n_id)
         
-        return pos_embs, neg_embs
+        return pos_embs.to(self.device), neg_embs.to(self.device)
 
 
     def predict(
@@ -200,7 +200,6 @@ class AnswerSpaceModel(nn.Module):
         """
         answers = [[] for _ in range(len(modes))]
 
-        # TODO: speed this up (GPU)!
         with torch.no_grad():
 
             # add extra dimension for broadcasting:  
@@ -213,7 +212,7 @@ class AnswerSpaceModel(nn.Module):
             # to    (1, num_ents, 1, 1, embed_dim)
             emb = self.ent_features.weight
             emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))
-            
+
             # calculate dot products of hyperplanes-embeddings
             # and convert positive/negative dot products to binary values
             # shape: (batch_size, num_ents, num_bands, band_size)
