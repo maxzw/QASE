@@ -37,7 +37,7 @@ class CompGCNConv(MessagePassing):
 		self.drop			= torch.nn.Dropout(self.dropout)
 
 		if self.use_bias: 
-			self.bias 		= Parameter(torch.zeros(out_channels))
+			self.bias 		= Parameter(torch.zeros(out_channels)).to(self.device)
 			# self.register_parameter('bias', Parameter(torch.zeros(out_channels)))
 		
 		if self.use_bn:
