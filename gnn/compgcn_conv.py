@@ -28,11 +28,11 @@ class CompGCNConv(MessagePassing):
 		self.dropout 		= dropout
 		self.device			= device
 
-		self.w_loop			= get_param((in_channels, out_channels))
-		self.w_in			= get_param((in_channels, out_channels))
-		self.w_out			= get_param((in_channels, out_channels))
-		self.w_rel 			= get_param((in_channels, out_channels))
-		self.loop_rel 		= get_param((1, in_channels))
+		self.w_loop			= get_param((in_channels, out_channels)).to(self.device)
+		self.w_in			= get_param((in_channels, out_channels)).to(self.device)
+		self.w_out			= get_param((in_channels, out_channels)).to(self.device)
+		self.w_rel 			= get_param((in_channels, out_channels)).to(self.device)
+		self.loop_rel 		= get_param((1, in_channels)).to(self.device)
 
 		self.drop			= torch.nn.Dropout(self.dropout)
 
@@ -81,8 +81,6 @@ class CompGCNConv(MessagePassing):
 		if self.device is None:
 			self.device = edge_index.device
 
-		print(rel_embed.device)
-		print(self.loop_rel.device)
 		rel_embed 	= torch.cat([rel_embed, self.loop_rel], dim=0) 			# contains in, out and loop
 		num_edges 	= edge_index.size(1)
 		edge_index	= torch.cat([edge_index, edge_index.flip(0)], dim=1) 	# add inverse relations to edge index
