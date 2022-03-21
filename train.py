@@ -41,12 +41,15 @@ def _train_epoch(
         loss, pos_d, neg_d = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
-        batch_losses += [loss.item()]
+        batch_losses += [loss.detach().item()]
         pos_distances += [pos_d.item()]
         neg_distances += [neg_d.item()]
 
-    logger.info(f"Mean pos: {torch.mean(torch.tensor(pos_distances))} | Mean neg: {torch.mean(torch.tensor(neg_distances))}")
-    return torch.mean(torch.tensor(batch_losses))
+    mean_loss = torch.mean(torch.tensor(batch_losses)).item()
+    mean_loss_p = torch.mean(torch.tensor(pos_distances)).item()
+    mean_loss_n = torch.mean(torch.tensor(neg_distances)).item()
+    logger.info(f"Mean epoch loss: {mean_loss:.5f} ({mean_loss_p:.5f} - {mean_loss_n:.5f}")
+    return mean_loss
 
 
 def train(
@@ -73,7 +76,6 @@ def train(
             loss_fn,
             optimizer
             )
-        logger.info(f"Mean epoch loss: {epoch_loss}")
         epoch_losses.append(epoch_loss)
 
         # evaluate

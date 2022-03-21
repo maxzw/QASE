@@ -68,6 +68,11 @@ class InvLReLUDistance(BandDistance):
 	    return '{}(slope={})'.format(self.__class__.__name__, self.pos_slope)
 
 
+# ---------- Classes for calculating hyperplane diversity ----------
+
+# TODO: build function to measure diversity...
+
+
 # ---------- Main loss class ----------
 
 
@@ -87,10 +92,10 @@ class AnswerSpaceLoss(nn.Module):
     def _calc_dot(self, hyp: Tensor, y: Tensor):
         """Calculated dot product between hyperplanes and entity."""
         
-        # extend y for calculating dot product:
+        # add extra dimensions to y for broadcasting:  
         # from  (batch_size, embed_dim)
-        # to    (batch_size, num_bands, num_hyperplanes, embed_dim)
-        y = y.reshape(y.size(0), 1, 1, y.size(1)).expand(-1, hyp.size(1), hyp.size(2), -1)
+        # to    (batch_size, 1, 1, embed_dim)
+        y = y.reshape(y.size(0), 1, 1, y.size(1))
         
         # calculate dot product with hyperplanes
         # to    (batch_size, num_bands, num_hyperplanes)
@@ -130,8 +135,7 @@ class AnswerSpaceLoss(nn.Module):
         loss =  p - n
 
         # return mean for batch
-        return torch.mean(loss), \
-            torch.mean(p.detach()), torch.mean(n.detach()) # (temporary)
+        return torch.mean(loss), torch.mean(p.detach()), torch.mean(n.detach())
 
     def __repr__(self):
 	    return '{}(Dist={}, aggr={})'.format(self.__class__.__name__, self.distance, self.aggr)

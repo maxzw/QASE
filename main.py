@@ -31,7 +31,7 @@ logging.info(f"Training on dataset: {dataset}")
 model = HypewiseGCN(
     data_dir=f"./data/{dataset}/processed/",
     embed_dim=128,
-    device=None,
+    device=device,
     num_bands=5,
     num_hyperplanes=10,
     gcn_layers=3,
