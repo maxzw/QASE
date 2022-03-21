@@ -43,16 +43,17 @@ class GCNModel(nn.Module):
         
         # create message passing layers
         layers = []
-        model_args = {
+        conv_args = {
             'in_channels': self.embed_dim,
             'out_channels': self.embed_dim,
             'comp': self.comp,
             'use_bias': self.use_bias,
             'use_bn': self.use_bn,
-            'dropout': self.dropout
+            'dropout': self.dropout,
+            'device': self.device
             }
         # if we share weights we define the model once, otherwise we define it upon call with partial
-        conv = CompGCNConv(**model_args) if self.share_weights else partial(CompGCNConv, **model_args)
+        conv = CompGCNConv(**conv_args) if self.share_weights else partial(CompGCNConv, **conv_args)
         for _ in range(num_layers - 1):
             layers += [
                 conv if self.share_weights else conv(),

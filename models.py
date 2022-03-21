@@ -203,20 +203,17 @@ class AnswerSpaceModel(nn.Module):
         # TODO: speed this up (GPU)!
         with torch.no_grad():
 
-            # transform hyperplanes:
+            # add extra dimension for broadcasting:  
             # from  (batch_size, num_bands, band_size, embed_dim)
-            # to    (batch_size, num_ents, num_bands, band_size, embed_dim)
-            hyp_1 = hyp.reshape(hyp.size(0), 1, hyp.size(1), hyp.size(2), hyp.size(3))\
-                .expand(-1, self.num_nodes, -1, -1, -1)
-            # TODO: implement broadcasting to speed up!
+            # to    (batch_size, 1, num_bands, band_size, embed_dim)       
+            hyp_1 = hyp.reshape(hyp.size(0), 1, hyp.size(1), hyp.size(2), hyp.size(3))            
             
-            # transform embeddings:
+            # add extra dimension for broadcasting:  
             # from  (num_ents, embed_dim)
-            # to    (batch_size, num_ents, num_bands, band_size, embed_dim)
+            # to    (1, num_ents, 1, 1, embed_dim)
             emb = self.ent_features.weight
-            emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))\
-                .expand(hyp.size(0), -1, hyp.size(1), hyp.size(2), -1)
-
+            emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))
+            
             # calculate dot products of hyperplanes-embeddings
             # and convert positive/negative dot products to binary values
             # shape: (batch_size, num_ents, num_bands, band_size)

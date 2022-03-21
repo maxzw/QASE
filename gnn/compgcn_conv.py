@@ -15,7 +15,8 @@ class CompGCNConv(MessagePassing):
 		comp: str = 'mult',
 		use_bias: bool = True,
 		use_bn: bool = True,
-		dropout: float = 0.0
+		dropout: float = 0.0,
+		device = None
 		):
 		super().__init__()
 
@@ -25,7 +26,7 @@ class CompGCNConv(MessagePassing):
 		self.use_bn 		= use_bn
 		self.comp_str 		= comp
 		self.dropout 		= dropout
-		self.device			= None
+		self.device			= device
 
 		self.w_loop			= get_param((in_channels, out_channels))
 		self.w_in			= get_param((in_channels, out_channels))
