@@ -4,13 +4,14 @@ from datetime import datetime
 from turtle import pos
 
 from helper import TqdmLoggingHandler
-from loss import AnswerSpaceLoss, InvLReLUDistance, SigmoidDistance
+from loss import AnswerSpaceLoss, SigmoidDistance
 from models import HypewiseGCN
 from loader import *
 from train import train
 from evaluation import evaluate
 
 dataset = "AIFB"
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # set log level
 dt = datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
@@ -30,24 +31,25 @@ logging.info(f"Training on dataset: {dataset}")
 model = HypewiseGCN(
     data_dir=f"./data/{dataset}/processed/",
     embed_dim=128,
-    device=None,
-    num_bands=4,
-    num_hyperplanes=6,
+    device=device,
+    num_bands=5,
+    num_hyperplanes=10,
     gcn_layers=3,
     gcn_stop_at_diameter=True,
     gcn_pool='tm',
     gcn_comp='mult',
     gcn_use_bias=True,
     gcn_use_bn=True,
-    gcn_dropout=0.0)
+    gcn_dropout=0.3,
+    gcn_share_weights=True)
 logging.info(f"Model: {model}")
     
 loss_fn = AnswerSpaceLoss(
-    dist_func=InvLReLUDistance(pos_slope=1e-7),
+    dist_func=SigmoidDistance(),
     aggr='softmin')
 logging.info(f"Loss: {loss_fn}")
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 logging.info(f"Optimizer: {optimizer}")
 
 
@@ -60,9 +62,9 @@ logging.info(f"Val info: {val_info}")
 test_queries, test_info = get_queries(model.data_dir, split='test', exclude=exclude)
 logging.info(f"Test info: {test_info}")
 
-train_dataloader = get_dataloader(train_queries, batch_size = 50, shuffle=True, num_workers=2)
-val_dataloader = get_dataloader(val_queries, batch_size = 50, shuffle=False, num_workers=2)
-test_dataloader = get_dataloader(test_queries, batch_size = 50, shuffle=False, num_workers=2)
+train_dataloader = get_dataloader(train_queries, batch_size = 128, shuffle=True, num_workers=2)
+val_dataloader = get_dataloader(val_queries, batch_size = 128, shuffle=False, num_workers=2)
+test_dataloader = get_dataloader(test_queries, batch_size = 128, shuffle=False, num_workers=2)
 
 epoch_losses, val_report = train(
     model=model,
@@ -85,3 +87,7 @@ torch.save(model.state_dict(), f"./results/{dataset}/best_model.pt")
 # save all results in ./results/{dataset}/{result_name}.npy and save model.
 # if better_than_current(test_report):
     # save...
+
+
+# TODO: use Colab for GPU
+# TODO: use AIM / WandB

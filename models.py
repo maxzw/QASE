@@ -4,7 +4,7 @@ import logging
 from abc import abstractmethod
 import pickle
 import random
-from typing import Sequence, Tuple
+from typing import Any, Sequence, Tuple
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -208,6 +208,7 @@ class AnswerSpaceModel(nn.Module):
             # to    (batch_size, num_ents, num_bands, band_size, embed_dim)
             hyp_1 = hyp.reshape(hyp.size(0), 1, hyp.size(1), hyp.size(2), hyp.size(3))\
                 .expand(-1, self.num_nodes, -1, -1, -1)
+            # TODO: implement broadcasting to speed up!
             
             # transform embeddings:
             # from  (num_ents, embed_dim)
@@ -266,18 +267,19 @@ class HypewiseGCN(AnswerSpaceModel):
     """Uses one GCN for every hyperplane"""
     def __init__(
         self,
-        data_dir,
-        embed_dim,
+        data_dir: str,
+        embed_dim: int,
         device,
-        num_bands,
-        num_hyperplanes,
-        gcn_layers,
-        gcn_stop_at_diameter,
-        gcn_pool,
-        gcn_comp,
-        gcn_use_bias,
-        gcn_use_bn,
-        gcn_dropout,
+        num_bands: int,
+        num_hyperplanes: int,
+        gcn_layers: int,
+        gcn_stop_at_diameter: bool,
+        gcn_pool: str,
+        gcn_comp: str,
+        gcn_use_bias: bool,
+        gcn_use_bn: bool,
+        gcn_dropout: float,
+        gcn_share_weights: bool
         ):
         
         # initiate superclass and build embeddings
@@ -296,6 +298,7 @@ class HypewiseGCN(AnswerSpaceModel):
         self.gcn_use_bias = gcn_use_bias
         self.gcn_use_bn = gcn_use_bn
         self.gcn_dropout = gcn_dropout
+        self.gcn_share_weights = gcn_share_weights
 
         # instantiate GCN models
         self.submodels = nn.ModuleList([
@@ -308,12 +311,14 @@ class HypewiseGCN(AnswerSpaceModel):
                 use_bias            = self.gcn_use_bias,
                 use_bn              = self.gcn_use_bn,
                 dropout             = self.gcn_dropout,
+                share_weights       = self.gcn_share_weights,
                 device              = self.device
                 ) for _ in range(self.num_bands * self.num_hyperplanes)
         ])
 
 
     def forward(self, x_batch: QueryBatchInfo) -> Tensor:
+        # output should be in shape (batch_size, num_bands, num_hyperplanes, embed_dim)
 
         data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
         
@@ -322,10 +327,21 @@ class HypewiseGCN(AnswerSpaceModel):
 
         
 class BandwiseGCN(AnswerSpaceModel):
-    """Uses one GCN for every band"""
-    pass
+    """Uses one GCN for every band."""
+    def __init__(
+        self,
+        data_dir: str,
+        embed_dim: int,
+        device,
+        ):
+        
+        # initiate superclass and build embeddings
+        super().__init__(data_dir, embed_dim, device)
+        self._build_embeddings()
 
+    def forward(self, x_batch: QueryBatchInfo) -> Tensor:
+        # output should be in shape (batch_size, num_bands, num_hyperplanes, embed_dim)
 
-class SingleGCN(AnswerSpaceModel):
-    """Uses one GCN for all hyperplanes"""
-    pass
+        data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
+
+        raise NotImplementedError
