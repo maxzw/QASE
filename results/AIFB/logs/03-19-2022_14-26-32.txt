@@ -1,0 +1,296 @@
+03/19/2022 02:26:32 |  root |  INFO | Training on dataset: AIFB
+03/19/2022 02:26:32 | models |  INFO | Created entity embeddings: Embedding(2601, 128)
+03/19/2022 02:26:32 | models |  INFO | Created variable embeddings: Embedding(6, 128)
+03/19/2022 02:26:32 | models |  INFO | Created relation embeddings: Embedding(49, 128)
+03/19/2022 02:26:32 |  root |  INFO | Model: HypewiseGCN(
+  (ent_features): Embedding(2601, 128)
+  (var_features): Embedding(6, 128)
+  (rel_features): Embedding(49, 128)
+  (submodels): ModuleList(
+    (0): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (1): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (2): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (3): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (4): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (5): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (6): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (7): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (8): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (9): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (10): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (11): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (12): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (13): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (14): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (15): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (16): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (17): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (18): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (19): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (20): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (21): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (22): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (23): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+  )
+)
+03/19/2022 02:26:32 |  root |  INFO | Loss: AnswerSpaceLoss(Dist=InvLReLUDistance(slope=1e-07), aggr=softmin)
+03/19/2022 02:26:32 |  root |  INFO | Optimizer: Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.001
+    weight_decay: 0
+)
+03/19/2022 02:27:00 |  root |  INFO | Train info: {'1-chain': 1162489}
+03/19/2022 02:27:00 |  root |  INFO | Val info: {'1-chain': 11843}
+03/19/2022 02:27:02 |  root |  INFO | Test info: {'1-chain': 131450}
+03/19/2022 02:31:20 | train |  INFO | Mean pos: 4.092175483703613 | Mean neg: 63.97212600708008
+03/19/2022 02:31:20 | train |  INFO | Mean epoch loss: -59.87995529174805
+03/19/2022 02:31:38 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.7068605297566796, 'pre': 0.021304214476146166, 'rec': 0.29081632653061223, 'f1': 0.039700132350077945}), 'macro': {'acc': 0.7068605297566796, 'pre': 0.021304214476146166, 'rec': 0.29081632653061223, 'f1': 0.039700132350077945}, 'weighted': {'acc': 0.7068605297566796, 'pre': 0.021304214476146166, 'rec': 0.29081632653061223, 'f1': 0.039700132350077945}}
+03/19/2022 02:35:57 | train |  INFO | Mean pos: 21.902976989746094 | Mean neg: 328.81982421875
+03/19/2022 02:35:57 | train |  INFO | Mean epoch loss: -306.9168395996094
+03/19/2022 02:36:22 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.4589758436056132, 'pre': 0.021937146612204604, 'rec': 0.43239795918367346, 'f1': 0.04175586391817124}), 'macro': {'acc': 0.4589758436056132, 'pre': 0.021937146612204604, 'rec': 0.43239795918367346, 'f1': 0.04175586391817124}, 'weighted': {'acc': 0.4589758436056132, 'pre': 0.021937146612204604, 'rec': 0.43239795918367346, 'f1': 0.04175586391817124}}
+03/19/2022 02:40:35 | train |  INFO | Mean pos: 52.90058135986328 | Mean neg: 772.1260986328125
+03/19/2022 02:40:35 | train |  INFO | Mean epoch loss: -719.2254638671875
+03/19/2022 02:40:54 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.42642480140887945, 'pre': 0.02196796025621692, 'rec': 0.4528061224489796, 'f1': 0.041902990344599114}), 'macro': {'acc': 0.42642480140887945, 'pre': 0.02196796025621692, 'rec': 0.4528061224489796, 'f1': 0.041902990344599114}, 'weighted': {'acc': 0.42642480140887945, 'pre': 0.02196796025621692, 'rec': 0.4528061224489796, 'f1': 0.041902990344599114}}
+03/19/2022 02:45:01 | train |  INFO | Mean pos: 96.5610580444336 | Mean neg: 1397.9605712890625
+03/19/2022 02:45:01 | train |  INFO | Mean epoch loss: -1301.3995361328125
+03/19/2022 02:45:21 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.4030896974725378, 'pre': 0.021994274453774904, 'rec': 0.4630102040816326, 'f1': 0.041993729766049204}), 'macro': {'acc': 0.4030896974725378, 'pre': 0.021994274453774904, 'rec': 0.4630102040816326, 'f1': 0.041993729766049204}, 'weighted': {'acc': 0.4030896974725378, 'pre': 0.021994274453774904, 'rec': 0.4630102040816326, 'f1': 0.041993729766049204}}
+03/19/2022 02:49:23 | train |  INFO | Mean pos: 146.13365173339844 | Mean neg: 2121.189453125
+03/19/2022 02:49:23 | train |  INFO | Mean epoch loss: -1975.0555419921875
+03/19/2022 02:49:42 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.4011284464039328, 'pre': 0.022008532850369578, 'rec': 0.4642857142857143, 'f1': 0.04202495692676778}), 'macro': {'acc': 0.4011284464039328, 'pre': 0.022008532850369578, 'rec': 0.4642857142857143, 'f1': 0.04202495692676778}, 'weighted': {'acc': 0.4011284464039328, 'pre': 0.022008532850369578, 'rec': 0.4642857142857143, 'f1': 0.04202495692676778}}
+03/19/2022 02:53:43 | train |  INFO | Mean pos: 206.738525390625 | Mean neg: 2965.100830078125
+03/19/2022 02:53:43 | train |  INFO | Mean epoch loss: -2758.362060546875
+03/19/2022 02:54:03 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.39954404875501476, 'pre': 0.022018741356781363, 'rec': 0.4655612244897959, 'f1': 0.04204878340310177}), 'macro': {'acc': 0.39954404875501476, 'pre': 0.022018741356781363, 'rec': 0.4655612244897959, 'f1': 0.04204878340310177}, 'weighted': {'acc': 0.39954404875501476, 'pre': 0.022018741356781363, 'rec': 0.4655612244897959, 'f1': 0.04204878340310177}}
+03/19/2022 03:03:52 | train |  INFO | Mean pos: 276.2671203613281 | Mean neg: 3997.417236328125
+03/19/2022 03:03:52 | train |  INFO | Mean epoch loss: -3721.150146484375
+03/19/2022 03:04:17 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.4054427607153083, 'pre': 0.022027832530167355, 'rec': 0.4630102040816326, 'f1': 0.04205489246374988}), 'macro': {'acc': 0.4054427607153083, 'pre': 0.022027832530167355, 'rec': 0.4630102040816326, 'f1': 0.04205489246374988}, 'weighted': {'acc': 0.4054427607153083, 'pre': 0.022027832530167355, 'rec': 0.4630102040816326, 'f1': 0.04205489246374988}}
+03/19/2022 03:08:35 | train |  INFO | Mean pos: 348.36529541015625 | Mean neg: 5069.4609375
+03/19/2022 03:08:35 | train |  INFO | Mean epoch loss: -4721.095703125
+03/19/2022 03:08:56 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.3987265268513523, 'pre': 0.022013451416697947, 'rec': 0.4642857142857143, 'f1': 0.04203392370674913}), 'macro': {'acc': 0.3987265268513523, 'pre': 0.022013451416697947, 'rec': 0.4642857142857143, 'f1': 0.04203392370674913}, 'weighted': {'acc': 0.3987265268513523, 'pre': 0.022013451416697947, 'rec': 0.4642857142857143, 'f1': 0.04203392370674913}}
+03/19/2022 03:13:36 | train |  INFO | Mean pos: 440.4669494628906 | Mean neg: 6216.0078125
+03/19/2022 03:13:36 | train |  INFO | Mean epoch loss: -5775.541015625
+03/19/2022 03:13:58 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.40264562495022765, 'pre': 0.021983412592376926, 'rec': 0.4604591836734694, 'f1': 0.041963393344583697}), 'macro': {'acc': 0.40264562495022765, 'pre': 0.021983412592376926, 'rec': 0.4604591836734694, 'f1': 0.041963393344583697}, 'weighted': {'acc': 0.40264562495022765, 'pre': 0.021983412592376926, 'rec': 0.4604591836734694, 'f1': 0.041963393344583697}}
+03/19/2022 03:18:52 | train |  INFO | Mean pos: 531.5198974609375 | Mean neg: 7672.3759765625
+03/19/2022 03:18:52 | train |  INFO | Mean epoch loss: -7140.857421875
+03/19/2022 03:19:14 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.4057080834820534, 'pre': 0.021994208385036865, 'rec': 0.45918367346938777, 'f1': 0.04197774578652766}), 'macro': {'acc': 0.4057080834820534, 'pre': 0.021994208385036865, 'rec': 0.45918367346938777, 'f1': 0.04197774578652766}, 'weighted': {'acc': 0.4057080834820534, 'pre': 0.021994208385036865, 'rec': 0.45918367346938777, 'f1': 0.04197774578652766}}
+03/19/2022 03:24:02 | train |  INFO | Mean pos: 640.6839599609375 | Mean neg: 9002.6689453125
+03/19/2022 03:24:02 | train |  INFO | Mean epoch loss: -8361.9853515625
+03/19/2022 03:24:25 | train |  INFO | Validation results: {'1-chain': defaultdict(<class 'list'>, {'acc': 0.40665123235047745, 'pre': 0.021976987738718177, 'rec': 0.4604591836734694, 'f1': 0.04195168784359676}), 'macro': {'acc': 0.40665123235047745, 'pre': 0.021976987738718177, 'rec': 0.4604591836734694, 'f1': 0.04195168784359676}, 'weighted': {'acc': 0.40665123235047745, 'pre': 0.021976987738718177, 'rec': 0.4604591836734694, 'f1': 0.04195168784359676}}

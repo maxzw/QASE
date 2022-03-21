@@ -1,19 +1,20 @@
 """Main script"""
 import logging
 from datetime import datetime
+from turtle import pos
 
 from helper import TqdmLoggingHandler
-from loss import AnswerSpaceLoss
+from loss import AnswerSpaceLoss, InvLReLUDistance, SigmoidDistance
 from models import HypewiseGCN
 from loader import *
 from train import train
 from evaluation import evaluate
 
+dataset = "AIFB"
 
 # set log level
-save_logs = True
 dt = datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
-filename = f"./results/logs/{dt}.txt"
+filename = f"./results/{dataset}/logs/{dt}.txt"
 open(filename, "x").close()
 logging.basicConfig(
             level=logging.INFO,
@@ -24,8 +25,10 @@ logging.basicConfig(
                 TqdmLoggingHandler()
             ])
 
+logging.info(f"Training on dataset: {dataset}")
+
 model = HypewiseGCN(
-    data_dir="./data/AIFB/processed/",
+    data_dir=f"./data/{dataset}/processed/",
     embed_dim=128,
     device=None,
     num_bands=4,
@@ -36,17 +39,26 @@ model = HypewiseGCN(
     gcn_comp='mult',
     gcn_use_bias=True,
     gcn_use_bn=True,
-    gcn_dropout=0.0,
-    )
+    gcn_dropout=0.0)
+logging.info(f"Model: {model}")
     
-loss_fn = AnswerSpaceLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
+loss_fn = AnswerSpaceLoss(
+    dist_func=InvLReLUDistance(pos_slope=1e-7),
+    aggr='softmin')
+logging.info(f"Loss: {loss_fn}")
+
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+logging.info(f"Optimizer: {optimizer}")
+
 
 # only train and test on 1-chain queries
 exclude = ['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter']
 train_queries, train_info = get_queries(model.data_dir, split='train', exclude=exclude)
+logging.info(f"Train info: {train_info}")
 val_queries, val_info = get_queries(model.data_dir, split='val', exclude=exclude)
-test_queries, val_info = get_queries(model.data_dir, split='test', exclude=exclude)
+logging.info(f"Val info: {val_info}")
+test_queries, test_info = get_queries(model.data_dir, split='test', exclude=exclude)
+logging.info(f"Test info: {test_info}")
 
 train_dataloader = get_dataloader(train_queries, batch_size = 50, shuffle=True, num_workers=2)
 val_dataloader = get_dataloader(val_queries, batch_size = 50, shuffle=False, num_workers=2)
@@ -57,13 +69,19 @@ epoch_losses, val_report = train(
     train_dataloader=train_dataloader,
     loss_fn=loss_fn,
     optimizer=optimizer,
-    num_epochs=2,
+    num_epochs=100,
     val_dataloader=val_dataloader,
-    val_freq=1
-)
-
-test_report = evaluate(model, test_dataloader)
-
+    val_freq=1)
 logging.info(epoch_losses)
 logging.info(val_report)
+
+test_report = evaluate(model, test_dataloader)
 logging.info(test_report)
+
+torch.save(model.state_dict(), f"./results/{dataset}/best_model.pt")
+
+# TODO: 
+# check if there are previous results if not, or current results are better:
+# save all results in ./results/{dataset}/{result_name}.npy and save model.
+# if better_than_current(test_report):
+    # save...

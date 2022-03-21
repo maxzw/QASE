@@ -11,7 +11,7 @@ from torch import Tensor
 
 from data.graph import _reverse_relation
 from gnn.gcn import GCNModel
-from loader import QueryBatchInfo, VectorizedQueryBatch
+from loader import QueryBatchInfo, QueryTargetInfo, VectorizedQueryBatch
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class AnswerSpaceModel(nn.Module):
     """Abstract class for embedding queries into sets of hyperplanes."""
     def __init__(self, data_dir, embed_dim, device):
-        super(AnswerSpaceModel, self).__init__()
+        super().__init__()
         self.data_dir = data_dir
         self.embed_dim = embed_dim
         self.device = device
@@ -108,6 +108,7 @@ class AnswerSpaceModel(nn.Module):
         reg_rel_embed = torch.empty((num_unique_edges, self.embed_dim))
         inv_rel_embed = torch.empty((num_unique_edges, self.embed_dim))
         edge_type = torch.empty((len(batch.edge_ids),), dtype=torch.int64)
+        # we keep track of edges already embedded to preserve memory
         all_ids = []
         for i, id in enumerate(batch.edge_ids):
             if id not in all_ids:
@@ -143,32 +144,35 @@ class AnswerSpaceModel(nn.Module):
 
     def embed_targets(
         self,
-        pos_ids: Tensor,
-        pos_modes: Sequence[str],
-        neg_ids: Tensor
+        data: QueryTargetInfo
         ) -> Tuple[Tensor, Tensor]:
         """Returns embeddings for both the positive and negative targets of a query.
 
         Args:
-            pos_ids (Tensor): Positive samples for the queries.
-            pos_modes (Sequence[str]): The modes of the positive target, used for sampling if
-                no negative sample is present.
-            neg_ids (Tensor): Negative samples for the queries.
+            data (QueryTargetInfo): Contains all info about the query targets.
+                See loader.py for more information.
 
         Returns:
             Tuple[Tensor, Tensor]: Returns output tensors of shape (batch_size, embed_dim),
                 one for both the positive and negative entities.
         """
 
-        pos_embs = torch.empty((len(pos_ids), self.embed_dim))
-        neg_embs = torch.empty((len(pos_ids), self.embed_dim))
+        pos_embs = torch.empty((len(data.pos_ids), self.embed_dim))
+        neg_embs = torch.empty((len(data.pos_ids), self.embed_dim))
         
-        for i, (p_id, p_m, n_id) in enumerate(zip(pos_ids, pos_modes, neg_ids)):
+        for i, (p_id, p_m, n_id, t_nodes) in enumerate(zip(
+            data.pos_ids,
+            data.pos_modes,
+            data.neg_ids,
+            data.target_nodes
+            )):
             pos_embs[i] = self.embed_ents(p_id)
             
-            # no sample found, pick random embedding form target type
+            # no sample found (-1), pick random embedding form target type 
+            # which is NOT an answer to the query
             if n_id == -1:
-                neg_embs[i] = self.embed_ents(torch.tensor(random.choice(self.nodes_per_mode[p_m])))
+                neg_sample = random.choice([e for e in self.nodes_per_mode[p_m] if e not in t_nodes])
+                neg_embs[i] = self.embed_ents(torch.tensor(neg_sample))
             
             else:
                 neg_embs[i] = self.embed_ents(n_id)
@@ -231,12 +235,13 @@ class AnswerSpaceModel(nn.Module):
             for batch_idx, batch in enumerate(ent_inds):
                 # for all entities for that batch
                 for ent_idx, ent_ind in enumerate(batch):
-                    # if the entity indicator is 1 (is in any band) and 
-                    # entity index (=ID) is of correct type
+                    # if the entity indicator is 1 (is in any band's answer space)
+                    # and entity index (=ID) is of correct type
                     if (ent_ind == 1) and (ent_idx in self.nodes_per_mode[modes[batch_idx]]):
                         # we add the entity index (=ID) to the answer list for that batch
                         answers[batch_idx].append(ent_idx)
         
+        assert len(answers) == hyp.size(0) == len(modes)
         return answers
 
 
@@ -276,7 +281,7 @@ class HypewiseGCN(AnswerSpaceModel):
         ):
         
         # initiate superclass and build embeddings
-        super(self.__class__, self).__init__(data_dir, embed_dim, device)
+        super().__init__(data_dir, embed_dim, device)
         self._build_embeddings()
 
         # meta info

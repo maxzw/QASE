@@ -17,7 +17,7 @@ class CompGCNConv(MessagePassing):
 		use_bn: bool = True,
 		dropout: float = 0.0
 		):
-		super(self.__class__, self).__init__()
+		super().__init__()
 
 		self.in_channels	= in_channels
 		self.out_channels	= out_channels
@@ -134,5 +134,11 @@ class CompGCNConv(MessagePassing):
 		return norm
 
 	def __repr__(self):
-		return '{}({}, {}, num_rels={})'.format(
-			self.__class__.__name__, self.in_channels, self.out_channels, self.num_rels)
+		return '{}({}, {}, comp={}, bias={}, batchnorm={}, dropout={})'.format(
+			self.__class__.__name__,
+			self.in_channels,
+			self.out_channels,
+			self.comp_str,
+			self.use_bias,
+			self.use_bn,
+			self.dropout)

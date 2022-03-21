@@ -25,7 +25,11 @@ def _train_epoch(
     model.train()
     
     # keep track of total loss in this epoch
-    epoch_loss = torch.zeros(size=tuple(), device=model.device)
+    batch_losses = []
+
+    # (temporary)
+    pos_distances = []
+    neg_distances = []
     
     x_info: QueryBatchInfo
     y_info: QueryTargetInfo
@@ -33,13 +37,16 @@ def _train_epoch(
         
         optimizer.zero_grad()
         hyp = model(x_info)
-        pos_emb, neg_emb = model.embed_targets(y_info.pos_ids, y_info. pos_modes, y_info.neg_ids)
-        loss: Tensor = loss_fn(hyp, pos_emb, neg_emb)
+        pos_emb, neg_emb = model.embed_targets(y_info)
+        loss, pos_d, neg_d = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
-        epoch_loss += loss.item() * x_info.batch_size.item()
+        batch_losses += [loss.item()]
+        pos_distances += [pos_d.item()]
+        neg_distances += [neg_d.item()]
 
-    return epoch_loss
+    logger.info(f"Mean pos: {torch.mean(torch.tensor(pos_distances))} | Mean neg: {torch.mean(torch.tensor(neg_distances))}")
+    return torch.mean(torch.tensor(batch_losses))
 
 
 def train(
@@ -66,7 +73,7 @@ def train(
             loss_fn,
             optimizer
             )
-        logger.info(f"Epoch loss: {epoch_loss}")
+        logger.info(f"Mean epoch loss: {epoch_loss}")
         epoch_losses.append(epoch_loss)
 
         # evaluate
@@ -75,7 +82,7 @@ def train(
                 model,
                 val_dataloader
             )
-            logger.info(val_results)
+            logger.info(f"Validation results: {val_results}")
             val_report.include(val_results, {'epoch': epoch})
 
     return epoch_losses, val_report.src

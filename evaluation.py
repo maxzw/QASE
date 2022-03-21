@@ -60,7 +60,7 @@ class ClassificationReport:
 class ClassificationData:
     """Collects and aggregates classification results for a single evaluation run"""
     def __init__(self):
-        self.src = {}
+        self.src = defaultdict(lambda: defaultdict(float))
 
     def include(self, results):
         """Include new classification metrics in report (see classification_metrics)"""
@@ -124,7 +124,8 @@ class ClassificationData:
             global_accuracy_m += [metrics['acc']]
             global_precision_m += [metrics['pre']]
             global_recall_m += [metrics['rec']]
-    
+
+        self.src['macro'] = {}
         self.src['macro']['acc'] = np.mean(global_accuracy_m)
         self.src['macro']['pre'] = np.mean(global_precision_m)
         self.src['macro']['rec'] = np.mean(global_recall_m)
@@ -132,6 +133,7 @@ class ClassificationData:
             (self.src['macro']['pre']*self.src['macro']['rec'])
             /(self.src['macro']['pre']+self.src['macro']['rec']))
 
+        self.src['weighted'] = {}
         self.src['weighted']['acc'] = np.mean(global_accuracy_w)
         self.src['weighted']['pre'] = np.mean(global_precision_w)
         self.src['weighted']['rec'] = np.mean(global_recall_w)
@@ -139,7 +141,7 @@ class ClassificationData:
              (self.src['weighted']['pre']*self.src['weighted']['rec'])
             /(self.src['weighted']['pre']+self.src['weighted']['rec']))
 
-        return self.src
+        return dict(self.src)
 
 
 def classification_metrics(
@@ -193,7 +195,7 @@ def classification_metrics(
         results[q_type]['pre'] += [precision]
         results[q_type]['rec'] += [recall]
     
-    return results
+    return dict(results)
 
 
 def evaluate(

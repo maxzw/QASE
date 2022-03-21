@@ -1,0 +1,256 @@
+03/19/2022 02:48:16 |  root |  INFO | Training on dataset: AIFB
+03/19/2022 02:48:16 | models |  INFO | Created entity embeddings: Embedding(2601, 128)
+03/19/2022 02:48:16 | models |  INFO | Created variable embeddings: Embedding(6, 128)
+03/19/2022 02:48:16 | models |  INFO | Created relation embeddings: Embedding(49, 128)
+03/19/2022 02:48:16 |  root |  INFO | Model: HypewiseGCN(
+  (ent_features): Embedding(2601, 128)
+  (var_features): Embedding(6, 128)
+  (rel_features): Embedding(49, 128)
+  (submodels): ModuleList(
+    (0): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (1): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (2): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (3): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (4): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (5): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (6): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (7): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (8): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (9): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (10): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (11): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (12): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (13): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (14): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (15): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (16): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (17): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (18): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (19): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (20): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (21): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (22): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+    (23): GCNModel(
+      (layers): ModuleList(
+        (0): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (1): ReLU()
+        (2): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+        (3): ReLU()
+        (4): CompGCNConv(128, 128, comp=mult, bias=True, batchnorm=True, dropout=0.0)
+      )
+      (pool): TargetPooling()
+    )
+  )
+)
+03/19/2022 02:48:48 |  root |  INFO | Train info: {'1-chain': 1162489}
+03/19/2022 02:48:48 |  root |  INFO | Val info: {'1-chain': 11843}
+03/19/2022 02:48:49 |  root |  INFO | Test info: {'1-chain': 131450}
+03/19/2022 02:53:12 | train |  INFO | Mean pos: 0.49890756607055664 | Mean neg: 0.5002909302711487
+03/19/2022 02:53:12 | train |  INFO | Mean epoch loss: -0.0013834104174748063

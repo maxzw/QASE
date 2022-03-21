@@ -71,11 +71,11 @@ class QueryBatchInfo:
 @dataclass
 class QueryTargetInfo:
     """Class that contains target info of a batch."""
-    pos_ids: Tensor             # (batch_size,). IDs of the target entities.
-    pos_modes: Sequence[str]    # (batch_size,). Modes of the target entities.
-    neg_ids: Tensor             # (batch_size,). IDs of the negative samples, share same mode as real targets.
-    q_types: Sequence[str]      # (batch_size,). Query structure: ['1-chain', '2-chain', ..., '3-inter_chain'].
-    target_nodes: Sequence      # (batch_size,). Nested list of target nodes (multiple answers to a query).
+    pos_ids: Tensor                     # (batch_size,). IDs of the target entities.
+    pos_modes: Sequence[str]            # (batch_size,). Modes of the target entities.
+    neg_ids: Tensor                     # (batch_size,). IDs of the negative samples, share same mode as real targets.
+    q_types: Sequence[str]              # (batch_size,). Query structure: ['1-chain', '2-chain', ..., '3-inter_chain'].
+    target_nodes: Sequence[Tuple[int]]  # (batch_size,). Nested list of target nodes (multiple answers to a query).
 
 
 @dataclass
@@ -169,6 +169,7 @@ class CompGCNDataset(Dataset):
             # --- collecting QueryTargetInfo data ---
             # target nodes are converted to tuple during preprocessing, so we take first index
             pos_ids += [query.target_node[0]]
+            target_nodes.append(query.target_node)
             pos_modes += [form.target_mode]
             # get negative sample
             if "inter" in form.query_type: # sample hard negative IDs per query
@@ -181,7 +182,6 @@ class CompGCNDataset(Dataset):
                 neg_id = random.choice(query.neg_samples)
             neg_ids += [neg_id]
             q_types += [form.query_type]
-            target_nodes.append(query.target_node)
 
         # --- aggregation ---
         ent_ids = torch.tensor(ent_ids, dtype=torch.long)
@@ -285,9 +285,11 @@ def get_queries(
             queries.update(load_queries_by_formula(data_dir + f"/{split}_queries_{i}.pkl"))
         else:
             i_queries = load_test_queries_by_formula(data_dir + f"/{split}_queries_{i}.pkl")
-            # NOTE: current framework does not track one_neg / full_neg queries
-            queries["one_neg"].update(i_queries["one_neg"])
-            queries["full_neg"].update(i_queries["full_neg"])
+            # NOTE: current framework does not track difference between one_neg / full_neg queries
+            # queries["one_neg"].update(i_queries["one_neg"])
+            # queries["full_neg"].update(i_queries["full_neg"])
+            queries.update(i_queries["one_neg"]) 
+            queries.update(i_queries["full_neg"])
 
     out_queries = []
     info = {}
