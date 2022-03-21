@@ -31,7 +31,7 @@ logging.info(f"Training on dataset: {dataset}")
 model = HypewiseGCN(
     data_dir=f"./data/{dataset}/processed/",
     embed_dim=128,
-    device=device,
+    device=None,
     num_bands=5,
     num_hyperplanes=10,
     gcn_layers=3,
@@ -51,7 +51,6 @@ logging.info(f"Loss: {loss_fn}")
 
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 logging.info(f"Optimizer: {optimizer}")
-
 
 # only train and test on 1-chain queries
 exclude = ['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter']
