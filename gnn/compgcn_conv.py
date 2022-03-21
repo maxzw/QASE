@@ -81,6 +81,8 @@ class CompGCNConv(MessagePassing):
 		if self.device is None:
 			self.device = edge_index.device
 
+		print(rel_embed.device)
+		print(self.loop_rel.device)
 		rel_embed 	= torch.cat([rel_embed, self.loop_rel], dim=0) 			# contains in, out and loop
 		num_edges 	= edge_index.size(1)
 		edge_index	= torch.cat([edge_index, edge_index.flip(0)], dim=1) 	# add inverse relations to edge index
