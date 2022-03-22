@@ -13,14 +13,31 @@ from evaluation import evaluate
 parser = ArgumentParser()
 
 # Dataset & model parameters
-parser.add_argument("--dataset",    type=str,       default="AIFB")
-parser.add_argument("--model",      type=str,       default="Hypewise")
+parser.add_argument("--dataset",        type=str,   default="AIFB")
+parser.add_argument("--model",          type=str,   default="Hypewise")
+parser.add_argument("--embed_dim",      type=int,   default=128)
+parser.add_argument("--num_bands",      type=int,   default=8)
+parser.add_argument("--band_size",      type=int,   default=6)
 
-# Gcn parameters
-parser.add_argument("--gcn_layers", type=int,       default=3)
+# GCN parameters
+parser.add_argument("--gcn_layers",     type=int,   default=3)
+parser.add_argument("--gcn_stop_dia",   type=bool,  default=True)
+parser.add_argument("--gcn_pool",       type=str,   default="tm")
+parser.add_argument("--gcn_comp",       type=str,   default="mult")
+parser.add_argument("--gcn_use_bias",   type=bool,  default=True)
+parser.add_argument("--gcn_use_bn",     type=bool,  default=True)
+parser.add_argument("--gcn_dropout",    type=float, default=0.3)
+parser.add_argument("--gcn_share_w",    type=bool,  default=True)
+
+# Loss parameters
+parser.add_argument("--dist",           type=float, default=0.01)
+parser.add_argument("--aggr",           type=float, default=0.01)
 
 # Training parameters
-parser.add_argument("--lr",         type=float,     default=0.01)
+parser.add_argument("--optim",          type=float, default=0.01)
+parser.add_argument("--lr",             type=float, default=0.01)
+parser.add_argument("--num_epochs",     type=float, default=0.01)
+parser.add_argument("--val_freq",       type=float, default=0.01)
 args = parser.parse_args()
 
 # Create logger
@@ -36,20 +53,24 @@ wandb.init(
 
 # Create model
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = HypewiseGCN(
-    data_dir=f"./data/{args.dataset}/processed/",
-    embed_dim=128,
-    device=device,
-    num_bands=5,
-    num_hyperplanes=10,
-    gcn_layers=3,
-    gcn_stop_at_diameter=True,
-    gcn_pool='tm',
-    gcn_comp='mult',
-    gcn_use_bias=True,
-    gcn_use_bn=True,
-    gcn_dropout=0.3,
-    gcn_share_weights=True)
+if args.model == "HypeWise":
+    model = HypewiseGCN(
+        data_dir=f"./data/{args.dataset}/processed/",
+        embed_dim=128,
+        device=device,
+        num_bands=8,
+        num_hyperplanes=12,
+        gcn_layers=3,
+        gcn_stop_at_diameter=True,
+        gcn_pool='tm',
+        gcn_comp='mult',
+        gcn_use_bias=True,
+        gcn_use_bn=True,
+        gcn_dropout=0.3,
+        gcn_share_weights=True)
+else:
+    raise NotImplementedError
+logging.info(f"Model: {model}")
 
 # Define loss function
 loss_fn = AnswerSpaceLoss(
@@ -87,16 +108,19 @@ epoch_losses, val_report = train(
 logging.info(epoch_losses)
 logging.info(val_report)
 
+# log for both batch-wise and epoch-wise
+# wandb.log({"value1": value1}, step=iteration, group="iteration")
+# wandb.log({"value2": value2}, step=epoch, group="epoch")
+
 # Evaluate on test data
 test_report = evaluate(model, test_dataloader)
+# TODO: add final WandB tracking -> summary value (also used for replacing old model)
 logging.info(test_report)
 
-# Save model if needed
-# remove old...
-torch.save(model.state_dict(), f"./results/{args.dataset}/{wandb.run.name}.pt")
 
 # TODO: 
 # check if there are previous results if not, or current results are better:
 # save all results in ./results/{dataset}/{result_name}.npy and save model.
 # if better_than_current(test_report):
     # save...
+torch.save(model.state_dict(), f"./results/{args.dataset}/{wandb.run.name}.pt")
