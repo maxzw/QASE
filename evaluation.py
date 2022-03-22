@@ -183,9 +183,9 @@ def classification_metrics(
     for pred_nodes, true_nodes, mode, q_type in zip(preds, trues, modes, q_types):
         
         tp = len([n for n in pred_nodes if n in true_nodes])
-        tn = len(nodes_per_mode[mode]) - len(set(list(pred_nodes) + list(true_nodes)))
+        tn = len([n for n in nodes_per_mode[mode] if (n not in pred_nodes) and (n not in true_nodes)])
         fp = len([n for n in pred_nodes if n not in true_nodes])
-        fn = len([n for n in true_nodes if n in pred_nodes])
+        fn = len([n for n in true_nodes if n not in pred_nodes])
         
         accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
@@ -224,4 +224,6 @@ def evaluate(
             )
         classif_data.include(results)
 
-    return classif_data.finalize()
+    eval_results = classif_data.finalize()
+    # TODO: track with WandB
+    return eval_results
