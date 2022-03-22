@@ -122,8 +122,8 @@ class AnswerSpaceLoss(nn.Module):
         elif self.aggr == 'mean':
             p = torch.mean(d_true, dim=-1)
         elif self.aggr == 'softmin':
-            p = self.sm(d_true)
-            p = torch.mean(d_true, dim=-1)
+            w = self.sm(d_true)
+            p = torch.mean(d_true * w, dim=-1)
         
         # aggregate the band-wise losses for negative samples. we want all bands to always 
         # move away from non-target entities, we even prefer them to contain no answers at 

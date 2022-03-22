@@ -1,0 +1,13 @@
+03/22/2022 07:01:10 |  root |  INFO | Training on dataset: AIFB
+03/22/2022 07:01:13 | models |  INFO | Created entity embeddings: Embedding(2601, 128)
+03/22/2022 07:01:13 | models |  INFO | Created variable embeddings: Embedding(6, 128)
+03/22/2022 07:01:13 | models |  INFO | Created relation embeddings: Embedding(49, 128)
+03/22/2022 07:01:13 |  root |  INFO | Loss: AnswerSpaceLoss(Dist=SigmoidDistance(), aggr=softmin)
+03/22/2022 07:01:13 |  root |  INFO | Optimizer: Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.01
+    weight_decay: 0
+)

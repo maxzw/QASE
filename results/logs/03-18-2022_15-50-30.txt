@@ -1,3 +1,0 @@
-03/18/2022 03:50:30 | models |  INFO | Created entity embeddings: Embedding(2601, 128)
-03/18/2022 03:50:30 | models |  INFO | Created variable embeddings: Embedding(6, 128)
-03/18/2022 03:50:30 | models |  INFO | Created relation embeddings: Embedding(49, 128)

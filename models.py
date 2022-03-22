@@ -4,7 +4,7 @@ import logging
 from abc import abstractmethod
 import pickle
 import random
-from typing import Any, Sequence, Tuple
+from typing import Sequence, Tuple
 import torch
 import torch.nn as nn
 from torch import Tensor

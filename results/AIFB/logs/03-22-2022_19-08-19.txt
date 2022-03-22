@@ -1,0 +1,16 @@
+03/22/2022 07:08:19 |  root |  INFO | Training on dataset: AIFB
+03/22/2022 07:08:23 | models |  INFO | Created entity embeddings: Embedding(2601, 128)
+03/22/2022 07:08:23 | models |  INFO | Created variable embeddings: Embedding(6, 128)
+03/22/2022 07:08:23 | models |  INFO | Created relation embeddings: Embedding(49, 128)
+03/22/2022 07:08:23 |  root |  INFO | Loss: AnswerSpaceLoss(Dist=SigmoidDistance(), aggr=softmin)
+03/22/2022 07:08:23 |  root |  INFO | Optimizer: Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.01
+    weight_decay: 0
+)
+03/22/2022 07:08:56 |  root |  INFO | Train info: {'1-chain': 1162489}
+03/22/2022 07:08:57 |  root |  INFO | Val info: {'1-chain': 11843}
+03/22/2022 07:08:57 |  root |  INFO | Test info: {'1-chain': 131450}
