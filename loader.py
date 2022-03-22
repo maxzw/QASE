@@ -297,8 +297,6 @@ def get_queries(
         if structure not in exclude:
             info[structure] = 0
             for _form, query_list in formulas.items():
-                
-                # query_list is an actual list of queries if _form is a Formula
                 out_queries += process_targets(query_list, aggr=(split != 'train'))
                 info[structure] += len(out_queries)
 
@@ -329,5 +327,5 @@ def get_dataloader(
         shuffle     = shuffle,
         collate_fn  = dataset.collate_fn,
         pin_memory  = True,
-        # num_workers = num_workers, # this does not work with W10 at the moment...
+        num_workers = num_workers
     )

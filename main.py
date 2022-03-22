@@ -13,12 +13,12 @@ from evaluation import evaluate
 parser = ArgumentParser()
 
 # Dataset & model parameters
-parser.add_argument("--dataset",        type=str,   default="AIFB")
-parser.add_argument("--model",          type=str,   default="hypewise")
-parser.add_argument("--load_best",      type=bool,  default=False)
-parser.add_argument("--embed_dim",      type=int,   default=128)
-parser.add_argument("--num_bands",      type=int,   default=8)
-parser.add_argument("--band_size",      type=int,   default=6)
+parser.add_argument("--dataset",        type=str,   default="AIFB",     help='Which dataset to use: ["AIFB", "AM", "BIO", "MUTAG"]')
+parser.add_argument("--model",          type=str,   default="hypewise", help='Which model to use: ["hypewise", "bandwise"]')
+parser.add_argument("--load_best",      type=bool,  default=False,      help='If best model for this dataset should be loaded')
+parser.add_argument("--embed_dim",      type=int,   default=128,        help='The embedding dimension')
+parser.add_argument("--num_bands",      type=int,   default=8,          help='The number of bands')
+parser.add_argument("--band_size",      type=int,   default=6,          help='The size of the bands (number of hyperplanes per band)')
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3)
@@ -31,8 +31,8 @@ parser.add_argument("--gcn_dropout",    type=float, default=0.3)
 parser.add_argument("--gcn_share_w",    type=bool,  default=True)
 
 # Loss parameters
-parser.add_argument("--dist",           type=str,   default="sigm")
-parser.add_argument("--loss_aggr",      type=str,   default="softmin")
+parser.add_argument("--dist",           type=str,   default="sigm",     help='The distance function used in the loss: ["sigm", "invlrelu"]')
+parser.add_argument("--loss_aggr",      type=str,   default="softmin",  help='The aggregation technique for band distances of positive samples: ["min", "mean", "softmin"]')
 
 # Training parameters
 parser.add_argument("--do_train",       type=bool,  default=True)
