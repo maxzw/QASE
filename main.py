@@ -81,7 +81,7 @@ epoch_losses, val_report = train(
     train_dataloader=train_dataloader,
     loss_fn=loss_fn,
     optimizer=optimizer,
-    num_epochs=1,
+    num_epochs=50,
     val_dataloader=val_dataloader,
     val_freq=1)
 logging.info(epoch_losses)
