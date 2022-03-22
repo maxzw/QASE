@@ -4,7 +4,7 @@ import logging
 from argparse import ArgumentParser
 
 from helper import create_logger
-from loss import AnswerSpaceLoss, SigmoidDistance
+from loss import AnswerSpaceLoss, InvLReLUDistance, SigmoidDistance
 from models import HypewiseGCN
 from loader import *
 from train import train
@@ -15,8 +15,7 @@ parser = ArgumentParser()
 # Dataset & model parameters
 parser.add_argument("--dataset",        type=str,   default="AIFB")
 parser.add_argument("--model",          type=str,   default="hypewise")
-# TODO: add load_model argument, if True: load from dataset folder and use saved params to initiate model,
-# then load model state dict.
+parser.add_argument("--load_best",      type=bool,  default=False)
 parser.add_argument("--embed_dim",      type=int,   default=128)
 parser.add_argument("--num_bands",      type=int,   default=8)
 parser.add_argument("--band_size",      type=int,   default=6)
@@ -36,14 +35,19 @@ parser.add_argument("--dist",           type=str,   default="sigm")
 parser.add_argument("--loss_aggr",      type=str,   default="softmin")
 
 # Training parameters
-# TODO: add do_train
-parser.add_argument("--optim",          type=str,   default=0.01)
-parser.add_argument("--lr",             type=float, default=0.01)
-parser.add_argument("--num_epochs",     type=int,   default=0.01)
-parser.add_argument("--val_freq",       type=int,   default=0.01)
-parser.add_argument("--early_stop",     type=int,   default=0.01)
-# TODO: add do_test
+parser.add_argument("--do_train",       type=bool,  default=True)
+parser.add_argument("--save_best",      type=bool,  default=True)
+parser.add_argument("--optim",          type=str,   default="adam")
+parser.add_argument("--lr",             type=float, default=0.001)
+parser.add_argument("--num_epochs",     type=int,   default=50)
+parser.add_argument("--val_freq",       type=int,   default=1)
+parser.add_argument("--min_epochs",     type=int,   default=5)
+parser.add_argument("--early_stop",     type=bool,  default=True)
+parser.add_argument("--do_test",        type=bool,  default=True)
 args = parser.parse_args()
+
+# Check some argument combinations
+# such as stop_dia and layers
 
 # Create logger
 create_logger(args.dataset)
@@ -61,30 +65,41 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if args.model == "hypewise":
     model = HypewiseGCN(
         data_dir=f"./data/{args.dataset}/processed/",
-        embed_dim=50,
+        embed_dim=args.embed_dim,
         device=device,
-        num_bands=2,
-        num_hyperplanes=4,
-        gcn_layers=3,
-        gcn_stop_at_diameter=True,
-        gcn_pool='tm',
-        gcn_comp='mult',
-        gcn_use_bias=True,
-        gcn_use_bn=True,
-        gcn_dropout=0.3,
-        gcn_share_weights=True)
+        num_bands=args.num_bands,
+        num_hyperplanes=args.band_size,
+        gcn_layers=args.gcn_layers,
+        gcn_stop_at_diameter=args.gcn_stop_dia,
+        gcn_pool=args.gcn_pool,
+        gcn_comp=args.gcn_comp,
+        gcn_use_bias=args.gcn_use_bias,
+        gcn_use_bn=args.gcn_use_bn,
+        gcn_dropout=args.gcn_dropout,
+        gcn_share_weights=args.gcn_share_w)
 else:
     raise NotImplementedError
 logging.info(f"Model: {model}")
 
 # Define loss function
+if args.dist == "sigm":
+    dist_fn = SigmoidDistance()
+elif args.dist == "invlrelu":
+    dist_fn = InvLReLUDistance()
+else:
+    raise NotImplementedError
 loss_fn = AnswerSpaceLoss(
-    dist_func=SigmoidDistance(),
+    dist_func=dist_fn,
     aggr=args.loss_aggr)
 logging.info(f"Loss: {loss_fn}")
 
 # Define optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+if args.opt == "adam":
+    optimizer = torch.optim.Adam(model.parameters(), args.lr)
+elif args.opt == "sgd":
+    optimizer = torch.optim.sgd(model.parameters(), args.lr)
+else:
+    raise NotImplementedError
 logging.info(f"Optimizer: {optimizer}")
 
 # Load queries
@@ -126,6 +141,7 @@ wandb.run.summary["weighted_f1"] = weighted_f1
 # check if there are previous results if not, or current results are better:
 # save all results in ./results/{dataset}/{result_name}.npy and save model AND arguments.
 # if better_than_current(test_report):
+    # first remove (archive) old model and config
     # save...
 
 # save
