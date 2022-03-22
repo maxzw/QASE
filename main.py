@@ -120,7 +120,7 @@ wandb.log({"test": {**test_results}})
 
 # Finalize run
 weighted_f1 = test_results['weighted']['f1']
-wandb.run.summary["weighed_f1"] = weighted_f1
+wandb.run.summary["weighted_f1"] = weighted_f1
 
 # TODO:
 # check if there are previous results if not, or current results are better:
