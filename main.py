@@ -53,23 +53,23 @@ wandb.init(
 
 # Create model
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-if args.model == "HypeWise":
-    model = HypewiseGCN(
-        data_dir=f"./data/{args.dataset}/processed/",
-        embed_dim=128,
-        device=device,
-        num_bands=8,
-        num_hyperplanes=12,
-        gcn_layers=3,
-        gcn_stop_at_diameter=True,
-        gcn_pool='tm',
-        gcn_comp='mult',
-        gcn_use_bias=True,
-        gcn_use_bn=True,
-        gcn_dropout=0.3,
-        gcn_share_weights=True)
-else:
-    raise NotImplementedError
+# if args.model == "Hypewise":
+model = HypewiseGCN(
+    data_dir=f"./data/{args.dataset}/processed/",
+    embed_dim=128,
+    device=device,
+    num_bands=8,
+    num_hyperplanes=12,
+    gcn_layers=3,
+    gcn_stop_at_diameter=True,
+    gcn_pool='tm',
+    gcn_comp='mult',
+    gcn_use_bias=True,
+    gcn_use_bn=True,
+    gcn_dropout=0.3,
+    gcn_share_weights=True)
+# else:
+#     raise NotImplementedError
 logging.info(f"Model: {model}")
 
 # Define loss function
