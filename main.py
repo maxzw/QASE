@@ -53,13 +53,6 @@ args = parser.parse_args()
 create_logger(args.dataset)
 logging.info(f"Training on dataset: {args.dataset}")
 
-# Login to WandB to track progress
-wandb.login()
-wandb.init(
-    project="thesis",
-    config=args
-)
-
 # Create model
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if args.model == "hypewise":
@@ -94,9 +87,9 @@ loss_fn = AnswerSpaceLoss(
 logging.info(f"Loss: {loss_fn}")
 
 # Define optimizer
-if args.opt == "adam":
+if args.optim == "adam":
     optimizer = torch.optim.Adam(model.parameters(), args.lr)
-elif args.opt == "sgd":
+elif args.optim == "sgd":
     optimizer = torch.optim.sgd(model.parameters(), args.lr)
 else:
     raise NotImplementedError
@@ -115,6 +108,13 @@ logging.info(f"Test info: {test_info}")
 train_dataloader = get_dataloader(train_queries, batch_size = 128, shuffle=True, num_workers=2)
 val_dataloader = get_dataloader(val_queries, batch_size = 128, shuffle=False, num_workers=2)
 test_dataloader = get_dataloader(test_queries, batch_size = 128, shuffle=False, num_workers=2)
+
+# Login to WandB to track progress
+wandb.login()
+wandb.init(
+    project="thesis",
+    config=args
+)
 
 # Run training
 epoch_losses, val_report = train(

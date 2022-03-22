@@ -286,8 +286,6 @@ def get_queries(
         else:
             i_queries = load_test_queries_by_formula(data_dir + f"/{split}_queries_{i}.pkl")
             # NOTE: current framework does not track difference between one_neg / full_neg queries
-            # queries["one_neg"].update(i_queries["one_neg"])
-            # queries["full_neg"].update(i_queries["full_neg"])
             queries.update(i_queries["one_neg"]) 
             queries.update(i_queries["full_neg"])
 
@@ -301,16 +299,8 @@ def get_queries(
             for _form, query_list in formulas.items():
                 
                 # query_list is an actual list of queries if _form is a Formula
-                if isinstance(_form, Formula):
-                    out_queries += process_targets(query_list, aggr=(split != 'train'))
-                    info[structure] += len(out_queries)
-                
-                # otherwise go down one more level:
-                # one_neg and full_neg queries contain extra nested layer
-                else:
-                    for _actual_form, actual_query_list in query_list.items():
-                        out_queries += process_targets(actual_query_list, aggr=(split != 'train'))
-                        info[structure] += len(out_queries)
+                out_queries += process_targets(query_list, aggr=(split != 'train'))
+                info[structure] += len(out_queries)
 
     return out_queries, info
 
