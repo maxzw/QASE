@@ -224,6 +224,4 @@ def evaluate(
             )
         classif_data.include(results)
 
-    eval_results = classif_data.finalize()
-    # TODO: track with WandB
-    return eval_results
+    return classif_data.finalize()

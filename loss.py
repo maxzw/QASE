@@ -81,10 +81,11 @@ class AnswerSpaceLoss(nn.Module):
     def __init__(
         self,
         dist_func: BandDistance,
-        aggr: str = 'min'
+        aggr: str = 'softmin'
         ):
         super().__init__()
         self.distance = dist_func
+        assert aggr in ['min', 'mean', 'softmin']
         self.aggr = aggr
         if aggr == 'softmin':
             self.sm = nn.Softmin(dim=1)
@@ -135,7 +136,7 @@ class AnswerSpaceLoss(nn.Module):
         loss =  p - n
 
         # return mean for batch
-        return torch.mean(loss), torch.mean(p.detach()), torch.mean(n.detach())
+        return torch.mean(loss), torch.mean(p.detach()).item(), torch.mean(n.detach()).item()
 
     def __repr__(self):
 	    return '{}(Dist={}, aggr={})'.format(self.__class__.__name__, self.distance, self.aggr)

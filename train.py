@@ -1,4 +1,6 @@
 """Training module"""
+import numpy as np
+import wandb
 import logging
 from tqdm import tqdm
 import torch
@@ -36,18 +38,23 @@ def _train_epoch(
         optimizer.zero_grad()
         hyp = model(x_info)
         pos_emb, neg_emb = model.embed_targets(y_info)
-        loss, pos_d, neg_d = loss_fn(hyp, pos_emb, neg_emb)
+        loss, p_dist, n_dist = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
+        
+        loss_val = loss.detach().item()
+        wandb.log({"train": {"batch": {"batch_loss": loss_val, "batch_p_dist": p_dist, "batch_n_dist": n_dist}}})
 
-        batch_losses.append(loss.detach().item())
-        pos_distances.append(pos_d.item())
-        neg_distances.append(neg_d.item())
+        batch_losses.append(loss_val)
+        pos_distances.append(p_dist)
+        neg_distances.append(n_dist)
 
-    mean_loss = torch.mean(torch.tensor(batch_losses)).item()
-    mean_loss_p = torch.mean(torch.tensor(pos_distances)).item()
-    mean_loss_n = torch.mean(torch.tensor(neg_distances)).item()
-    logger.info(f"Mean epoch loss: {mean_loss:.5f} ({mean_loss_p:.5f} - {mean_loss_n:.5f}")
+    mean_loss   = np.mean(batch_losses)
+    mean_dist_p = np.mean(pos_distances)
+    mean_dist_n = np.mean(neg_distances)
+    
+    logger.info(f"Mean epoch loss: {mean_loss:.5f} ({mean_dist_p:.5f} - {mean_dist_n:.5f})")
+    wandb.log({"train": {"epoch": {"mean_loss": mean_loss, "mean_loss_p": mean_dist_p, "mean_loss_n": mean_dist_n}}})
     return mean_loss
 
 
@@ -82,8 +89,9 @@ def train(
             val_results = evaluate(
                 model,
                 val_dataloader
-            )
-            logger.info(f"Validation results: {val_results}")
+                )
             val_report.include(val_results, {'epoch': epoch})
+            logger.info(f"Validation results: {val_results}")
+            wandb.log({"val": {**val_results}})
 
     return epoch_losses, val_report.src
