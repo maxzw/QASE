@@ -180,6 +180,7 @@ class AnswerSpaceModel(nn.Module):
         return pos_embs.to(self.device), neg_embs.to(self.device)
 
 
+    @abstractmethod
     def predict(
         self,
         hyp: Tensor,
@@ -198,52 +199,11 @@ class AnswerSpaceModel(nn.Module):
         Returns:
             Sequence[Sequence[int]]: Nested list of predicted answer entities per batch.
         """
-        answers = [[] for _ in range(len(modes))]
-
-        with torch.no_grad():
-
-            # add extra dimension for broadcasting:  
-            # from  (batch_size, num_bands, band_size, embed_dim)
-            # to    (batch_size, 1, num_bands, band_size, embed_dim)       
-            hyp_1 = hyp.reshape(hyp.size(0), 1, hyp.size(1), hyp.size(2), hyp.size(3))            
-            
-            # add extra dimension for broadcasting:  
-            # from  (num_ents, embed_dim)
-            # to    (1, num_ents, 1, 1, embed_dim)
-            emb = self.ent_features.weight.to(self.device)
-            emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))
-
-            # calculate dot products of hyperplanes-embeddings
-            # and convert positive/negative dot products to binary values
-            # shape: (batch_size, num_ents, num_bands, band_size)
-            dot_inds = (torch.sum(hyp_1 * emb_1, dim=-1) > 0).float()
-
-            # get sum of positive-side indicators, if sum == num_bands, 
-            # all hyperplanes are positive and the band contains the answer
-            # shape: (batch_size, num_ents, num_bands)
-            band_inds = (dot_inds.sum(dim=-1) == dot_inds.size(3)).float()
-
-            # get sum of bands that contain the answer,
-            # if any band contains the entity, then the entity is a predicted answer
-            # shape: (batch_size, num_ents)
-            ent_inds = (band_inds.sum(dim=-1) > 0).float()
-
-            # iterate through all batches
-            for batch_idx, batch in enumerate(ent_inds):
-                # for all entities for that batch
-                for ent_idx, ent_ind in enumerate(batch):
-                    # if the entity indicator is 1 (is in any band's answer space)
-                    # and entity index (=ID) is of correct type
-                    if (ent_ind == 1) and (ent_idx in self.nodes_per_mode[modes[batch_idx]]):
-                        # we add the entity index (=ID) to the answer list for that batch
-                        answers[batch_idx].append(ent_idx)
-        
-        assert len(answers) == hyp.size(0) == len(modes)
-        return answers
+        raise NotImplementedError
 
 
     @abstractmethod
-    def forward(self, batch):
+    def forward(self, batch: QueryBatchInfo) -> Tensor:
         """
         First embeds and then forwards the query graph batch through the GCN submodels.
 
@@ -313,6 +273,57 @@ class HypewiseGCN(AnswerSpaceModel):
         ])
 
 
+    def predict(
+        self,
+        hyp: Tensor,
+        modes: Sequence[str]
+        ) -> Sequence[Sequence[int]]:
+
+        answers = [[] for _ in range(len(modes))]
+
+        # TODO: Think about doing it batch-wise with the embeddings that apply to
+        # this specific target mode, to save GPU memory.
+
+        with torch.no_grad():
+
+            # add extra dimension for broadcasting:  
+            # from  (batch_size, num_bands, band_size, embed_dim)
+            # to    (batch_size, 1, num_bands, band_size, embed_dim)       
+            hyp_1 = hyp.reshape(hyp.size(0), 1, hyp.size(1), hyp.size(2), hyp.size(3))            
+            
+            # add extra dimension for broadcasting:  
+            # from  (num_ents, embed_dim)
+            # to    (1, num_ents, 1, 1, embed_dim)
+            emb = self.ent_features.weight.to(self.device)
+            emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))
+
+            # calculate dot products of hyperplanes-embeddings
+            # and convert positive/negative dot products to binary values
+            # shape: (batch_size, num_ents, num_bands, band_size)
+            dot_inds = (torch.sum(hyp_1 * emb_1, dim=-1) > 0)
+
+            # only if all hyperplanes in a band are positive and the band contains the answer
+            # shape: (batch_size, num_ents, num_bands)
+            band_inds = torch.all(dot_inds, dim=3)
+
+            # if any band contains the entity, then the entity is a predicted answer
+            # shape: (batch_size, num_ents)
+            ent_inds = torch.any(band_inds, dim=2)
+
+            # iterate through all batches
+            for batch_idx, batch in enumerate(ent_inds):
+                # for all entities for that batch
+                for ent_idx, ent_ind in enumerate(batch):
+                    # if the entity indicator is 1 (is in any band's answer space)
+                    # and entity index (=ID) is of correct type
+                    if ent_ind and (ent_idx in self.nodes_per_mode[modes[batch_idx]]):
+                        # we add the entity index (=ID) to the answer list for that batch
+                        answers[batch_idx].append(ent_idx)
+        
+        assert len(answers) == len(modes) == hyp.size(0)
+        return answers
+
+
     def forward(self, x_batch: QueryBatchInfo) -> Tensor:
         # output should be in shape (batch_size, num_bands, num_hyperplanes, embed_dim)
 
@@ -334,6 +345,15 @@ class BandwiseGCN(AnswerSpaceModel):
         # initiate superclass and build embeddings
         super().__init__(data_dir, embed_dim, device)
         self._build_embeddings()
+
+
+    def predict(
+        self,
+        hyp: Tensor,
+        modes: Sequence[str]
+        ) -> Sequence[Sequence[int]]:
+        raise NotImplementedError
+
 
     def forward(self, x_batch: QueryBatchInfo) -> Tensor:
         # output should be in shape (batch_size, num_bands, num_hyperplanes, embed_dim)

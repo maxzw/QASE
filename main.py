@@ -1,4 +1,5 @@
 """Main script"""
+from copyreg import pickle
 import wandb
 import logging
 from argparse import ArgumentParser
@@ -13,45 +14,52 @@ from evaluation import evaluate
 parser = ArgumentParser()
 
 # Dataset & model parameters
-parser.add_argument("--dataset",        type=str,   default="AIFB",     help='Which dataset to use: ["AIFB", "AM", "BIO", "MUTAG"]')
-parser.add_argument("--model",          type=str,   default="hypewise", help='Which model to use: ["hypewise", "bandwise"]')
-parser.add_argument("--load_best",      type=bool,  default=False,      help='If best model for this dataset should be loaded')
-parser.add_argument("--embed_dim",      type=int,   default=128,        help='The embedding dimension')
-parser.add_argument("--num_bands",      type=int,   default=8,          help='The number of bands')
-parser.add_argument("--band_size",      type=int,   default=6,          help='The size of the bands (number of hyperplanes per band)')
+parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Which dataset to use: ['AIFB', 'AM', 'BIO', 'MUTAG']")
+parser.add_argument("--model",          type=str,   default="hypewise", help="Which model to use: ['hypewise', 'bandwise']")
+parser.add_argument("--load_best",      type=bool,  default=False,      help="If best model for this dataset should be loaded")
+parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension")
+parser.add_argument("--num_bands",      type=int,   default=8,          help="The number of bands")
+parser.add_argument("--band_size",      type=int,   default=6,          help="The size of the bands (number of hyperplanes per band)")
 
 # GCN parameters
-parser.add_argument("--gcn_layers",     type=int,   default=3)
-parser.add_argument("--gcn_stop_dia",   type=bool,  default=True)
-parser.add_argument("--gcn_pool",       type=str,   default="tm")
-parser.add_argument("--gcn_comp",       type=str,   default="mult")
-parser.add_argument("--gcn_use_bias",   type=bool,  default=True)
-parser.add_argument("--gcn_use_bn",     type=bool,  default=True)
-parser.add_argument("--gcn_dropout",    type=float, default=0.3)
-parser.add_argument("--gcn_share_w",    type=bool,  default=True)
+parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
+parser.add_argument("--gcn_stop_dia",   type=bool,  default=True,       help="If message passing stopping stops when number of passes equals query diameter")
+parser.add_argument("--gcn_pool",       type=str,   default="tm",       help="Graph pooling operator: ['max', 'sum', 'tm']")
+parser.add_argument("--gcn_comp",       type=str,   default="mult",     help="Composition operator: ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot']")
+parser.add_argument("--gcn_use_bias",   type=bool,  default=True,       help="If convolution layer contains bias")
+parser.add_argument("--gcn_use_bn",     type=bool,  default=True,       help="If convolution layer contains batch normalization")
+parser.add_argument("--gcn_dropout",    type=float, default=0.3,        help="If convolution layer contains dropout")
+parser.add_argument("--gcn_share_w",    type=bool,  default=True,       help="If the weights of the convolution layer are shared within a GCN")
 
 # Loss parameters
-parser.add_argument("--dist",           type=str,   default="sigm",     help='The distance function used in the loss: ["sigm", "invlrelu"]')
-parser.add_argument("--loss_aggr",      type=str,   default="softmin",  help='The aggregation technique for band distances of positive samples: ["min", "mean", "softmin"]')
+parser.add_argument("--dist",           type=str,   default="sigm",     help="The distance function used in the loss: ['sigm', 'invlrelu']")
+parser.add_argument("--loss_aggr",      type=str,   default="softmin",  help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
+
+# Optimizer parameters
+parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
+parser.add_argument("--lr",             type=float, default=0.001,      help="Learning rate")
 
 # Training parameters
-parser.add_argument("--do_train",       type=bool,  default=True)
-parser.add_argument("--save_best",      type=bool,  default=True)
-parser.add_argument("--optim",          type=str,   default="adam")
-parser.add_argument("--lr",             type=float, default=0.001)
-parser.add_argument("--num_epochs",     type=int,   default=50)
-parser.add_argument("--val_freq",       type=int,   default=1)
-parser.add_argument("--min_epochs",     type=int,   default=5)
-parser.add_argument("--early_stop",     type=bool,  default=True)
-parser.add_argument("--do_test",        type=bool,  default=True)
+parser.add_argument("--do_train",       type=bool,  default=True,       help="If we go through training loop (disable for testing loaded model)")
+parser.add_argument("--save_best",      type=bool,  default=True,       help="If model should be saved if it performs better than current best model")
+parser.add_argument("--num_epochs",     type=int,   default=50,         help="Number of training epochs")
+parser.add_argument("--val_freq",       type=int,   default=1,          help="Validation frequency (epochs)")
+parser.add_argument("--min_epochs",     type=int,   default=5,          help="The minimal number of epochs to train (only relevant in combination with early stopping)")
+parser.add_argument("--early_stop",     type=bool,  default=True,       help="If we apply early stopping")
+parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
 args = parser.parse_args()
 
-# Check some argument combinations
-# such as stop_dia and layers
+# Check argument combinations
+# TODO
 
 # Create logger
 create_logger(args.dataset)
 logging.info(f"Training on dataset: {args.dataset}")
+
+# Load model if needed
+if args.load_best:
+    # TODO
+    pass
 
 # Create model
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -122,7 +130,7 @@ epoch_losses, val_report = train(
     train_dataloader=train_dataloader,
     loss_fn=loss_fn,
     optimizer=optimizer,
-    num_epochs=2,
+    num_epochs=10,
     val_dataloader=val_dataloader,
     val_freq=1)
 logging.info(epoch_losses)
@@ -137,21 +145,11 @@ wandb.log({"test": {**test_results}})
 weighted_f1 = test_results['weighted']['f1']
 wandb.run.summary["weighted_f1"] = weighted_f1
 
-# TODO:
-# check if there are previous results if not, or current results are better:
-# save all results in ./results/{dataset}/{result_name}.npy and save model AND arguments.
-# if better_than_current(test_report):
-    # first remove (archive) old model and config
-    # save...
-
-# save
-# with open('commandline_args.txt', 'w') as f:
-#     json.dump(args.__dict__, f, indent=2)
-
-# load
-# parser = ArgumentParser()
-# args = parser.parse_args()
-# with open('commandline_args.txt', 'r') as f:
-#     args.__dict__ = json.load(f)
-
-torch.save(model.state_dict(), f"./results/{args.dataset}/{wandb.run.name}.pt")
+# # Save model if needed
+# if args.save_best and is_best(args.dataset, test_results, metric='weighted_f1'):
+#     # Archive files of previous best
+#     archive_prev_best(args.dataset)
+#     # For new best, save test results, model arguments and model weights
+#     pickle.dump(test_results, open(f"./results/{args.dataset}/test_results.pkl", 'wb'))
+#     pickle.dump(args.__dict__, open(f"./results/{args.dataset}/model_args.pkl", 'wb'))
+#     torch.save(model.state_dict(), f"./results/{args.dataset}/{wandb.run.name}.pt")

@@ -88,7 +88,7 @@ class AnswerSpaceLoss(nn.Module):
         assert aggr in ['min', 'mean', 'softmin']
         self.aggr = aggr
         if aggr == 'softmin':
-            self.sm = nn.Softmin(dim=1)
+            self.sm = nn.Softmin(dim=-1)
 
     def _calc_dot(self, hyp: Tensor, y: Tensor):
         """Calculated dot product between hyperplanes and entity."""
@@ -123,8 +123,7 @@ class AnswerSpaceLoss(nn.Module):
         elif self.aggr == 'mean':
             p = torch.mean(d_true, dim=-1)
         elif self.aggr == 'softmin':
-            w = self.sm(d_true)
-            p = torch.mean(d_true * w, dim=-1)
+            p = torch.sum(d_true * self.sm(d_true), dim=-1)
         
         # aggregate the band-wise losses for negative samples. we want all bands to always 
         # move away from non-target entities, we even prefer them to contain no answers at 

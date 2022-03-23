@@ -1,8 +1,9 @@
 """Training module"""
-import numpy as np
 import wandb
 import logging
+import numpy as np
 from tqdm import tqdm
+
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
