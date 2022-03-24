@@ -1,12 +1,12 @@
 """Metamodel implementation."""
 
 import logging
-from abc import abstractmethod
 import pickle
 import random
-import time
-from typing import Sequence, Tuple
 import numpy as np
+from abc import abstractmethod
+from typing import Sequence, Tuple
+
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -170,8 +170,7 @@ class AnswerSpaceModel(nn.Module):
             )):
             pos_embs[i] = self.embed_ents(p_id)
             
-            # no sample found (-1), pick random embedding form target type 
-            # which is NOT an answer to the query
+            # no sample found (-1), pick random embedding form target type NOT an answer to the query
             if n_id == -1:
                 neg_sample = random.choice([e for e in self.nodes_per_mode[p_m] if e not in t_nodes])
                 neg_embs[i] = self.embed_ents(torch.tensor(neg_sample))
@@ -182,26 +181,65 @@ class AnswerSpaceModel(nn.Module):
         return pos_embs.to(self.device), neg_embs.to(self.device)
 
 
-    @abstractmethod
     def predict(
         self,
         hyp: Tensor,
         modes: Sequence[str]
         ) -> Sequence[Sequence[int]]:
-        """
-        Given a configuration of hyperplanes predict the entity IDs that are 
-        part of the answer. These entities are filtered for target mode.
 
-        Args:
-            hyp (Tensor): Shape (batch_size, num_bands, band_size, embed_dim).
-                The hyperplanes outputted by the model.
-            modes (Sequence[str]): Shape (batch_size,).
-                The modes belonging to the target nodes, used for filtering.
+        answers = [[] for _ in range(len(modes))]
 
-        Returns:
-            Sequence[Sequence[int]]: Nested list of predicted answer entities per batch.
-        """
-        raise NotImplementedError
+        with torch.no_grad():
+            
+            # we tackle prediction mode-wise, since it requires relatively large matrix operations and
+            # using all entities and filtering afterwards is very slow.
+            for mode in set(modes):
+
+                # batch indices that have this target mode
+                batch_mode_idx = torch.from_numpy(np.where(np.array(modes) == mode)[0])
+
+                # select queries with this mode:
+                # (batch_size_mode, num_bands, band_size, embed_dim)
+                mode_hyp = torch.index_select(hyp, 0, batch_mode_idx) 
+
+                # select entity embeddings with this mode:
+                # (num_ents_mode, embed_dim)
+                mode_emb = self.ent_features(torch.tensor(self.nodes_per_mode[mode])).to(self.device)
+
+                # add extra dimension to hyperplanes for broadcasting:  
+                # from  (batch_size_mode, num_bands, band_size, embed_dim)
+                # to    (batch_size_mode, 1, num_bands, band_size, embed_dim)       
+                mode_hyp_1 = mode_hyp.reshape(mode_hyp.size(0), 1, mode_hyp.size(1), mode_hyp.size(2), mode_hyp.size(3))          
+
+                # add extra dimension for broadcasting:  
+                # from  (num_ents_mode, embed_dim)
+                # to    (1, num_ents_mode, 1, 1, embed_dim)
+                mode_emb_1 = mode_emb.reshape(1, mode_emb.size(0), 1, 1, mode_emb.size(1))
+
+                # calculate dot products of hyperplanes-embeddings
+                # and convert positive/negative dot products to binary values
+                # shape: (batch_size_mode, num_ents_mode, num_bands, band_size)
+                dot_inds = (torch.sum(mode_hyp_1 * mode_emb_1, dim=-1) > 0)
+
+                # only if all hyperplanes in a band are positive and the band contains the answer
+                # shape: (batch_size_mode, num_ents_mode, num_bands)
+                band_inds = torch.all(dot_inds, dim=-1)
+
+                # if any band contains the entity, then the entity is a predicted answer
+                # shape: (batch_size_mode, num_ents_mode)
+                ent_inds = torch.any(band_inds, dim=-1)
+
+                # iterate through all batches
+                for batch_idx, batch in zip(batch_mode_idx, ent_inds):
+                    # for all entities for that batch
+                    for ent_idx, ent_ind in enumerate(batch):
+                        # if the entity indicator is True (is in any band's answer space)
+                        if ent_ind:
+                            # we add the global entity index (=ID) to the answer list for that batch
+                            answers[batch_idx].append(self.nodes_per_mode[mode][ent_idx])
+                
+        assert len(answers) == len(modes) == hyp.size(0)
+        return answers
 
 
     @abstractmethod
@@ -214,11 +252,14 @@ class AnswerSpaceModel(nn.Module):
                 Contains all information needed for message passing and readout.
 
         Returns:
-            Tensor: Shape (batch_size, num_bands, num_hyperplanes, embed_dim)
+            Tensor: Shape (batch_size, num_bands, band_size, embed_dim)
                 Collection of hyperplanes that demarcate the answer space.
         """
         data: VectorizedQueryBatch = self.vectorize_batch(batch)
         raise NotImplementedError
+
+
+# TODO: combine two below classes into one (then we can also combine the top one... :-D )
 
 
 class HypewiseGCN(AnswerSpaceModel):
@@ -229,7 +270,7 @@ class HypewiseGCN(AnswerSpaceModel):
         embed_dim: int,
         device,
         num_bands: int,
-        num_hyperplanes: int,
+        band_size: int,
         gcn_layers: int,
         gcn_stop_at_diameter: bool,
         gcn_pool: str,
@@ -246,7 +287,7 @@ class HypewiseGCN(AnswerSpaceModel):
 
         # meta info
         self.num_bands = num_bands
-        self.num_hyperplanes = num_hyperplanes
+        self.band_size = band_size
 
         # gcn info
         self.gcn_layers = gcn_layers
@@ -261,8 +302,7 @@ class HypewiseGCN(AnswerSpaceModel):
         # instantiate GCN models
         self.submodels = nn.ModuleList([
             GCNModel(
-                embed_dim           = self.embed_dim,
-                num_layers          = self.gcn_layers,
+                layer_dims          = [self.embed_dim for _ in range(gcn_layers + 1)],
                 stop_at_diameter    = self.gcn_stop_at_diameter,
                 pool                = gcn_pool,
                 comp                = self.gcn_comp,
@@ -271,114 +311,76 @@ class HypewiseGCN(AnswerSpaceModel):
                 dropout             = self.gcn_dropout,
                 share_weights       = self.gcn_share_weights,
                 device              = self.device
-                ) for _ in range(self.num_bands * self.num_hyperplanes)
+                ) for _ in range(self.num_bands * self.band_size)
         ])
 
 
-    def predict(
-        self,
-        hyp: Tensor,
-        modes: Sequence[str]
-        ) -> Sequence[Sequence[int]]:
-
-        answers = [[] for _ in range(len(modes))]
-        answers1 = [[] for _ in range(len(modes))]
-
-        with torch.no_grad():
-
-            for mode in set(modes):
-
-                # batch indices that have this target mode
-                batch_mode_idx = torch.from_numpy(np.where(np.array(modes) == mode)[0])
-                print(batch_mode_idx)
-
-                # select queries with this mode:
-                # (batch_size_mode, num_bands, band_size, embed_dim)
-                mode_hyp = torch.index_select(hyp, 0, batch_mode_idx) 
-                print(mode_hyp.size()) # [28, 6, 4, 128]
-
-                # select entity embeddings with this mode:
-                # (num_ents_mode, embed_dim)
-                mode_emb = self.ent_features(torch.tensor(self.nodes_per_mode[mode])).to(self.device)
-                print(mode_emb.size()) # [146, 128]
-
-                # add extra dimension to hyperplanes for broadcasting:  
-                # from  (batch_size_mode, num_bands, band_size, embed_dim)
-                # to    (batch_size_mode, 1, num_bands, band_size, embed_dim)       
-                mode_hyp_1 = mode_hyp.reshape(mode_hyp.size(0), 1, mode_hyp.size(1), mode_hyp.size(2), mode_hyp.size(3))          
-                print(mode_hyp_1.size()) # [28, 1, 6, 4, 128]
-
-                # add extra dimension for broadcasting:  
-                # from  (num_ents_mode, embed_dim)
-                # to    (1, num_ents_mode, 1, 1, embed_dim)
-                mode_emb_1 = mode_emb.reshape(1, mode_emb.size(0), 1, 1, mode_emb.size(1))
-                print(mode_emb_1.size()) # [1, 146, 1, 1, 128]
-
-                # calculate dot products of hyperplanes-embeddings
-                # and convert positive/negative dot products to binary values
-                # shape: (batch_size_mode, num_ents_mode, num_bands, band_size)
-                dot_inds = (torch.sum(mode_hyp_1 * mode_emb_1, dim=-1) > 0)
-                print(dot_inds.size()) # [28, 146, 6, 4]
-
-                # only if all hyperplanes in a band are positive and the band contains the answer
-                # shape: (batch_size_mode, num_ents_mode, num_bands)
-                band_inds = torch.all(dot_inds, dim=-1)
-                print(band_inds.size()) # [28, 146, 6]
-
-                # if any band contains the entity, then the entity is a predicted answer
-                # shape: (batch_size_mode, num_ents_mode)
-                ent_inds = torch.any(band_inds, dim=-1)
-                print(ent_inds.size()) # [28, 146]
-
-                # iterate through all batches
-                for batch_idx, batch in zip(batch_mode_idx, ent_inds):
-                    # for all entities for that batch
-                    for ent_idx, ent_ind in enumerate(batch):
-                        # if the entity indicator is True (is in any band's answer space)
-                        if ent_ind:
-                            # we add the global(!) entity index (=ID) to the answer list for that batch
-                            answers[batch_idx].append(self.nodes_per_mode[mode][ent_idx])
-                
-        assert len(answers) == len(modes) == hyp.size(0)
-
-        return answers
-
-
     def forward(self, x_batch: QueryBatchInfo) -> Tensor:
-        # output should be in shape (batch_size, num_bands, num_hyperplanes, embed_dim)
+        # output should be in shape (batch_size, num_bands, band_size, embed_dim)
 
         data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
         
         return torch.cat([gcn(data) for gcn in self.submodels], dim=-1).reshape(
-            data.batch_size, self.num_bands, self.num_hyperplanes, self.embed_dim)
+            data.batch_size, self.num_bands, self.band_size, self.embed_dim)
 
-        
-class BandwiseGCN(AnswerSpaceModel):
-    """Uses one GCN for every band."""
+
+class BandWiseGCN(AnswerSpaceModel):
+    """Uses one GCN for every band"""
     def __init__(
         self,
         data_dir: str,
         embed_dim: int,
         device,
+        num_bands: int,
+        band_size: int,
+        layer_dims: int,
+        gcn_stop_at_diameter: bool,
+        gcn_pool: str,
+        gcn_comp: str,
+        gcn_use_bias: bool,
+        gcn_use_bn: bool,
+        gcn_dropout: float,
+        gcn_share_weights: bool
         ):
         
         # initiate superclass and build embeddings
         super().__init__(data_dir, embed_dim, device)
         self._build_embeddings()
 
+        # meta info
+        self.num_bands = num_bands
+        self.band_size = band_size
 
-    def predict(
-        self,
-        hyp: Tensor,
-        modes: Sequence[str]
-        ) -> Sequence[Sequence[int]]:
-        raise NotImplementedError
+        # gcn info
+        self.layer_dims = layer_dims
+        self.gcn_stop_at_diameter = gcn_stop_at_diameter
+        self.gcn_pool = gcn_pool
+        self.gcn_comp = gcn_comp
+        self.gcn_use_bias = gcn_use_bias
+        self.gcn_use_bn = gcn_use_bn
+        self.gcn_dropout = gcn_dropout
+        self.gcn_share_weights = gcn_share_weights
+
+        # instantiate GCN models
+        self.submodels = nn.ModuleList([
+            GCNModel(
+                layer_dims          = self.layer_dims,
+                stop_at_diameter    = self.gcn_stop_at_diameter,
+                pool                = gcn_pool,
+                comp                = self.gcn_comp,
+                use_bias            = self.gcn_use_bias,
+                use_bn              = self.gcn_use_bn,
+                dropout             = self.gcn_dropout,
+                share_weights       = self.gcn_share_weights,
+                device              = self.device
+                ) for _ in range(self.num_bands)
+        ])
 
 
     def forward(self, x_batch: QueryBatchInfo) -> Tensor:
-        # output should be in shape (batch_size, num_bands, num_hyperplanes, embed_dim)
+        # output should be in shape (batch_size, num_bands, band_size, embed_dim)
 
         data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
-
-        # TODO: Implement
-        raise NotImplementedError
+        
+        return torch.cat([gcn(data) for gcn in self.submodels], dim=-1).reshape(
+            data.batch_size, self.num_bands, self.band_size, self.embed_dim)

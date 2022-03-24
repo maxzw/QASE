@@ -1,6 +1,7 @@
 """GCN model implementation using composition-based convolution."""
 
-from functools import partial 
+from typing import Sequence 
+
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -14,8 +15,7 @@ from gnn.pooling import *
 class GCNModel(nn.Module):
     def __init__(
         self,
-        embed_dim: int = 128,
-        num_layers: int = 3,
+        layer_dims: Sequence[int],
         stop_at_diameter: bool = True,
         pool: str = 'max',
         comp: str = 'mult',
@@ -26,42 +26,64 @@ class GCNModel(nn.Module):
         device=None
         ):
         super().__init__()
-        self.embed_dim = embed_dim
-        self.num_layers = num_layers
+        self.layer_dims = layer_dims
         self.stop_at_diameter = stop_at_diameter
         assert pool in ['max', 'sum', 'tm'], \
-            f"Readout function {pool} is not implemented."
+            f"Readout function {pool} is not implemented!"
         self.pool_str = pool
         assert comp in ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot'], \
-            f"Composition operation {comp} is not implemented."
+            f"Composition operation {comp} is not implemented!"
         self.comp = comp
         self.use_bias = use_bias
         self.use_bn = use_bn
         self.dropout = dropout
+        assert (len(set(self.layer_dims)) == 1) == share_weights, \
+            f"Cannot share weights while using varying layer dimensions!"
         self.share_weights = share_weights
         self.device = device       
         
-        # create message passing layers
+        # Create message passing layers
         layers = []
         conv_args = {
-            'in_channels': self.embed_dim,
-            'out_channels': self.embed_dim,
             'comp': self.comp,
             'use_bias': self.use_bias,
             'use_bn': self.use_bn,
             'dropout': self.dropout,
             'device': self.device
             }
-        # if we share weights we define the model once, otherwise we define it upon call with partial
-        conv = CompGCNConv(**conv_args) if self.share_weights else partial(CompGCNConv, **conv_args)
-        for _ in range(num_layers - 1):
-            layers += [
-                conv if self.share_weights else conv(),
-                nn.ReLU()]
-        layers += [conv if self.share_weights else conv()]
+        # If we share weights across layers, we assume all layer dimensions are the same
+        if share_weights:
+            conv_args.update({
+                'in_channels': self.layer_dims[0],
+                'out_channels': self.layer_dims[0],
+            })
+            conv = CompGCNConv(**conv_args)
+            for i in range(len(self.layer_dims) - 2):
+                layers += [
+                    conv,
+                    nn.ReLU()]
+            layers += [conv]
+
+        # If we do not share weights or have different in/output dimensions
+        else:
+            for i in range(len(self.layer_dims) - 2):
+                conv_args.update({
+                    'in_channels': self.layer_dims[i],
+                    'out_channels': self.layer_dims[i+1],
+                })
+                layers += [
+                    CompGCNConv(**conv_args),
+                    nn.ReLU()]
+            conv_args.update({
+                    'in_channels': self.layer_dims[-2],
+                    'out_channels': self.layer_dims[-1],
+                })
+            layers += [CompGCNConv(**conv_args)]
+        
+        # Save as ModuleList
         self.layers = nn.ModuleList(layers)
 
-        # define readout function
+        # Define readout function
         if pool == 'max':
             self.pool = MaxGraphPooling()
         elif pool == 'sum':

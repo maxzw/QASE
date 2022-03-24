@@ -33,6 +33,6 @@ def create_logger(dataset: str):
                 ])
 
 def get_param(shape):
-	param = Parameter(torch.Tensor(*shape)); 	
-	xavier_normal_(param.data)
-	return param
+    param = Parameter(torch.Tensor(*shape)); 	
+    xavier_normal_(param.data)
+    return param

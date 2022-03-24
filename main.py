@@ -1,25 +1,26 @@
 """Main script"""
-from copyreg import pickle
+
 import wandb
 import logging
 from argparse import ArgumentParser
 
 from helper import create_logger
 from loss import AnswerSpaceLoss, InvLReLUDistance, SigmoidDistance
-from models import HypewiseGCN
+from models import BandWiseGCN, HypewiseGCN
 from loader import *
 from train import train
 from evaluation import evaluate
+
 
 parser = ArgumentParser()
 
 # Dataset & model parameters
 parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Which dataset to use: ['AIFB', 'AM', 'BIO', 'MUTAG']")
+# parser.add_argument("--load_best",      type=bool,  default=False,      help="If best model for this dataset should be loaded")
 parser.add_argument("--model",          type=str,   default="hypewise", help="Which model to use: ['hypewise', 'bandwise']")
-parser.add_argument("--load_best",      type=bool,  default=False,      help="If best model for this dataset should be loaded")
-parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension")
-parser.add_argument("--num_bands",      type=int,   default=8,          help="The number of bands")
-parser.add_argument("--band_size",      type=int,   default=6,          help="The size of the bands (number of hyperplanes per band)")
+parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension of the entities and relations")
+parser.add_argument("--num_bands",      type=int,   default=6,          help="The number of bands")
+parser.add_argument("--band_size",      type=int,   default=4,          help="The size of the bands (number of hyperplanes per band)")
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
@@ -33,53 +34,51 @@ parser.add_argument("--gcn_share_w",    type=bool,  default=True,       help="If
 
 # Loss parameters
 parser.add_argument("--dist",           type=str,   default="sigm",     help="The distance function used in the loss: ['sigm', 'invlrelu']")
-parser.add_argument("--loss_aggr",      type=str,   default="softmin",  help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
+parser.add_argument("--loss_aggr",      type=str,   default="min",      help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
 
 # Optimizer parameters
 parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
-parser.add_argument("--lr",             type=float, default=0.001,      help="Learning rate")
+parser.add_argument("--lr",             type=float, default=1e-3,       help="Learning rate")
 
 # Training parameters
-parser.add_argument("--do_train",       type=bool,  default=True,       help="If we go through training loop (disable for testing loaded model)")
-parser.add_argument("--save_best",      type=bool,  default=True,       help="If model should be saved if it performs better than current best model")
+# parser.add_argument("--do_train",       type=bool,  default=True,       help="If we go through training loop (disable for testing loaded model)")
+# parser.add_argument("--save_best",      type=bool,  default=True,       help="If model should be saved if it performs better than current best model")
 parser.add_argument("--num_epochs",     type=int,   default=50,         help="Number of training epochs")
 parser.add_argument("--val_freq",       type=int,   default=1,          help="Validation frequency (epochs)")
 parser.add_argument("--min_epochs",     type=int,   default=5,          help="The minimal number of epochs to train (only relevant in combination with early stopping)")
-parser.add_argument("--early_stop",     type=bool,  default=True,       help="If we apply early stopping")
-parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
+parser.add_argument("--early_stop",     type=int,   default=None,       help="Number of rounds after training is stopped when loss does not go down")
+# parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
 args = parser.parse_args()
 
-# TODO: nest arguments + come up with 'main' function that can be called in hpo
-
 # Check argument combinations
-# TODO
+# Cannot use stop_at_dia and share_weights with BandWiseGCN
 
 # Create logger
 create_logger(args.dataset)
 logging.info(f"Training on dataset: {args.dataset}")
 
-# Load model if needed
-if args.load_best:
-    # TODO
-    pass
-
 # Create model
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model_args = {
+    "data_dir": f"./data/{args.dataset}/processed/",
+    "embed_dim": args.embed_dim,
+    "device": device,
+    "num_bands": args.num_bands,
+    "band_size": args.band_size,
+    "gcn_stop_at_diameter": args.gcn_stop_dia,
+    "gcn_pool": args.gcn_pool,
+    "gcn_comp": args.gcn_comp,
+    "gcn_use_bias": args.gcn_use_bias,
+    "gcn_use_bn": args.gcn_use_bn,
+    "gcn_dropout": args.gcn_dropout,
+    "gcn_share_weights": args.gcn_share_w
+}
 if args.model == "hypewise":
-    model = HypewiseGCN(
-        data_dir=f"./data/{args.dataset}/processed/",
-        embed_dim=args.embed_dim,
-        device=device,
-        num_bands=args.num_bands,
-        num_hyperplanes=args.band_size,
-        gcn_layers=args.gcn_layers,
-        gcn_stop_at_diameter=args.gcn_stop_dia,
-        gcn_pool=args.gcn_pool,
-        gcn_comp=args.gcn_comp,
-        gcn_use_bias=args.gcn_use_bias,
-        gcn_use_bn=args.gcn_use_bn,
-        gcn_dropout=args.gcn_dropout,
-        gcn_share_weights=args.gcn_share_w)
+    model_args.update({"gcn_layers": 3})
+    model = HypewiseGCN(**model_args)
+elif args.model == "bandwise":
+    model_args.update({"layer_dims": [128, 256, 384, 512]})
+    model = BandWiseGCN(**model_args)
 else:
     raise NotImplementedError
 logging.info(f"Model: {model}")
@@ -94,6 +93,8 @@ else:
 loss_fn = AnswerSpaceLoss(
     dist_func=dist_fn,
     aggr=args.loss_aggr)
+# TODO: define get_loss_fn(args.dist, args.loss_aggr) that can be reused in hpo.py
+# Do this for all things...
 logging.info(f"Loss: {loss_fn}")
 
 # Define optimizer
@@ -119,12 +120,14 @@ train_dataloader = get_dataloader(train_queries, batch_size = 128, shuffle=True,
 val_dataloader = get_dataloader(val_queries, batch_size = 128, shuffle=False, num_workers=2)
 test_dataloader = get_dataloader(test_queries, batch_size = 128, shuffle=False, num_workers=2)
 
-# Login to WandB to track progress
+# Initialize WandB logging
 wandb.login()
 wandb.init(
     project="thesis",
-    config=args
-)
+    config=args,
+    group=args.dataset,
+    job_type="run"
+    )
 
 # Run training
 epoch_losses, val_report = train(
@@ -132,20 +135,21 @@ epoch_losses, val_report = train(
     train_dataloader=train_dataloader,
     loss_fn=loss_fn,
     optimizer=optimizer,
-    num_epochs=10,
+    num_epochs=args.num_epochs,
     val_dataloader=val_dataloader,
-    val_freq=1)
+    val_freq=args.val_freq,
+    early_stop=args.early_stop)
 logging.info(epoch_losses)
 logging.info(val_report)
 
 # Evaluate on test data
 test_results = evaluate(model, test_dataloader)
 logging.info(test_results)
-wandb.log({"test": {**test_results}})
+wandb.log({"test": test_results})
 
 # Finalize run
-weighted_f1 = test_results['weighted']['f1']
-wandb.run.summary["weighted_f1"] = weighted_f1
+summary_value = test_results['weighted']['f1']
+wandb.run.summary["weighted_f1"] = summary_value
 
 # # Save model if needed
 # if args.save_best and is_best(args.dataset, test_results, metric='weighted_f1'):
@@ -154,4 +158,4 @@ wandb.run.summary["weighted_f1"] = weighted_f1
 #     # For new best, save test results, model arguments and model weights
 #     pickle.dump(test_results, open(f"./results/{args.dataset}/test_results.pkl", 'wb'))
 #     pickle.dump(args.__dict__, open(f"./results/{args.dataset}/model_args.pkl", 'wb'))
-#     torch.save(model.state_dict(), f"./results/{args.dataset}/{wandb.run.name}.pt")
+torch.save(model.state_dict(), f"./results/{args.dataset}/{wandb.run.name}.pt")

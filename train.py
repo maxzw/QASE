@@ -1,11 +1,15 @@
 """Training module"""
+
 import wandb
+import optuna
 import logging
-import numpy as np
 from tqdm import tqdm
 
+import numpy as np
+from pandas import DataFrame
+from typing import Optional, Sequence, Tuple
+
 import torch
-from torch import Tensor
 from torch.utils.data import DataLoader
 
 from models import AnswerSpaceModel
@@ -22,7 +26,7 @@ def _train_epoch(
     loss_fn: AnswerSpaceLoss,
     optimizer: torch.optim.Optimizer,
     epoch: int
-    ) -> Tensor:
+    ) -> float:
     """Train the model for one epoch."""
     
     # put the model in train mode
@@ -46,8 +50,12 @@ def _train_epoch(
         
         loss_val = loss.detach().item()
         
+        # Log batch metrics to WandB
         curr_batch = epoch * len(dataloader) + batch_nr
-        wandb.log({"train": {"batch": {"batch_loss": loss_val, "batch_p_dist": p_dist, "batch_n_dist": n_dist, "batch_id": curr_batch}}})
+        wandb.log({
+            "train": {
+                "batch": {
+                    "batch_loss": loss_val, "batch_p_dist": p_dist, "batch_n_dist": n_dist, "batch_id": curr_batch}}})
 
         batch_losses.append(loss_val)
         pos_distances.append(p_dist)
@@ -57,8 +65,13 @@ def _train_epoch(
     mean_dist_p = np.mean(pos_distances)
     mean_dist_n = np.mean(neg_distances)
     
+    # Log epoch metrics to WandB
     logger.info(f"Mean epoch loss: {mean_loss:.5f} ({mean_dist_p:.5f} - {mean_dist_n:.5f})")
-    wandb.log({"train": {"epoch": {"mean_loss": mean_loss, "mean_loss_p": mean_dist_p, "mean_loss_n": mean_dist_n, "epoch_id": epoch}}})
+    wandb.log({
+        "train": {
+            "epoch": {
+                "mean_loss": mean_loss, "mean_dist_p": mean_dist_p, "mean_dist_n": mean_dist_n, "epoch_id": epoch}}})
+    
     return mean_loss
 
 
@@ -70,16 +83,23 @@ def train(
     num_epochs: int,
     val_dataloader: DataLoader,
     val_freq: int,
-    ):
+    early_stop: Optional[int] = None,
+    trial: Optional[optuna.Trial] = None
+    ) -> Tuple[Sequence[float], DataFrame]:
 
-    # keep track of total loss during training
+    # Keep track of total loss during training
     epoch_losses = []
+    if early_stop is not None:
+        lowest_loss = np.inf
+        early_stop_counter = 0
 
-    # keep track of classification statistics during training
+    # Keep track of classification statistics during training
     val_report = ClassificationReport()
     
-    # train
+    # Training loop
     for epoch in tqdm(range(num_epochs), desc="Training", unit="Epoch", position=0):
+        
+        # Train for one epoch
         epoch_loss = _train_epoch(
             model,
             train_dataloader,
@@ -89,14 +109,35 @@ def train(
             )
         epoch_losses.append(epoch_loss)
 
-        # evaluate
+        # Evaluate
         if (epoch + 1) % val_freq == 0:
             val_results = evaluate(
                 model,
-                val_dataloader
+                val_dataloader,
+                epoch # Means we're tracking answer set size
                 )
-            val_report.include(val_results, {'epoch': epoch})
+
+            # Log val results and include in training report
+            val_report.include(val_results, epoch)
             logger.info(f"Validation results: {val_results}")
-            wandb.log({"val": {**val_results,  **{"epoch_id:": epoch}}})
+            wandb.log({"val": {**val_results,  "epoch_id": epoch}})
+
+            # If needed, handle pruning based on the intermediate objective value
+            if trial is not None:
+                trial.report(val_results['macro']['f1'], epoch)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+        
+        # Apply early stopping if needed (and not in trial)
+        if (early_stop is not None) and (trial is None):
+            if epoch_loss < lowest_loss:
+                lowest_loss = epoch_loss
+                early_stop_counter = 0
+            else:
+                early_stop_counter += 1
+                logging.info(f"Loss has not decreased! Current best: {lowest_loss:.3f}, current: {epoch_loss:.3f}. At ({early_stop_counter}/{early_stop}) of early stopping.")
+            if early_stop_counter >= early_stop:
+                logging.info(f"Loss has not decreased for {early_stop} rounds, aborting training...")
+                break
 
     return epoch_losses, val_report.src

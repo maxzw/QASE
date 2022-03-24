@@ -1,10 +1,14 @@
-"""Evaluation functions"""
-from collections import defaultdict
+"""Evaluation module"""
+
+import wandb
 import logging
-from typing import Mapping, Sequence
+from tqdm import tqdm
+
 import numpy as np
 from pandas import DataFrame
-from tqdm import tqdm
+from collections import defaultdict
+from typing import Mapping, Optional, Sequence
+
 from torch.utils.data import DataLoader
 
 from loader import QueryBatchInfo, QueryTargetInfo
@@ -18,7 +22,7 @@ class ClassificationReport:
     def __init__(self):
         self.src = DataFrame()
 
-    def flatten_dict(self, data: Mapping[str, Mapping[str, float]]):
+    def flatten_dict(self, data: Mapping[str, Mapping[str, float]]) -> Mapping[str, float]:
         """
         Concatenates the keys in the nested input dict.
 
@@ -47,14 +51,14 @@ class ClassificationReport:
                 out_dict[f"{structure}_{metric}"] = value
         return out_dict
 
-    def include(self, data: dict, ref_index: dict):
+    def include(self, data: dict, epoch: int) -> None:
         """Include the evaluation data in dataframe.
 
         Args:
             data (dict): See ClassificationData.finalize() for details.
             ref_index (dict): A reference index ('unit': index) used for plotting.
         """
-        self.src = self.src.append({**ref_index, **self.flatten_dict(data)}, ignore_index=True)
+        self.src = self.src.append({"epoch": epoch, **self.flatten_dict(data)}, ignore_index=True)
 
 
 class ClassificationData:
@@ -62,7 +66,7 @@ class ClassificationData:
     def __init__(self):
         self.src = defaultdict(lambda: defaultdict(float))
 
-    def include(self, results):
+    def include(self, results) -> None:
         """Include new classification metrics in report (see classification_metrics)"""
         if not self.src:
             self.src = results
@@ -71,7 +75,7 @@ class ClassificationData:
                 for metric, values in metrics.items():
                     self.src[structure][metric] += values
 
-    def finalize(self):
+    def finalize(self) -> Mapping[str, Mapping[str, float]]:
         """
         Calculate mean metrics per query structure, add global macro-,
         weighted-average and f1-score per metric and return resulting dictionary.
@@ -82,6 +86,7 @@ class ClassificationData:
                     acc:    float
                     pre:    float
                     rec:    float
+                    f1:     float
                 },
                 'structure_2': {
                     ...
@@ -89,12 +94,14 @@ class ClassificationData:
                 'macro': {
                     acc:    float
                     pre:    float
-                    rec:    float                
+                    rec:    float    
+                    f1:     float
                 },
                 'weighted': {
                     acc:    float
                     pre:    float
                     rec:    float
+                    f1:     float
                 }
             }
         """
@@ -150,7 +157,7 @@ def classification_metrics(
     modes: Sequence[str],
     nodes_per_mode: Mapping[str, Sequence[int]],
     q_types: Sequence[str],
-    ):
+    ) -> Mapping[str, Mapping[str, Sequence[float]]]:
     """
     Calculates classification statistics for a batch of queries.
 
@@ -200,18 +207,35 @@ def classification_metrics(
 
 def evaluate(
     model: AnswerSpaceModel,
-    dataloader: DataLoader
-    ):
+    dataloader: DataLoader,
+    epoch: Optional[int] = None
+    ) -> Mapping[str, Mapping[str, float]]:
+    """
+    Evaluation function.
+
+    Args:
+        model (AnswerSpaceModel): The model.
+        dataloader (DataLoader): Dataloader that contains the data to be evaluated.
+        epoch (Optional[int], optional): The current epoch in which evaluation occurs.
+            Indicates that we track answer space size. Defaults to None.
+
+    Returns:
+        Mapping[str, Mapping[str, float]]: Dictionary with results (see ClassificationData.finalize).
+    """
     
-    # put the model in eval mode
+    # Put the model in eval mode
     model.eval()
 
-    # track classification metrics during eval run
+    # Track classification metrics during eval run
     classif_data = ClassificationData()
+
+    # Track and log average answer set size to WandB as proxy for answer space size
+    if epoch is not None:
+        answer_sizes = np.empty(len(dataloader))
 
     x_info: QueryBatchInfo
     y_info: QueryTargetInfo
-    for x_info, y_info in tqdm(dataloader, desc="Evaluate", unit="batch", position=1, leave=False):
+    for batch_id, (x_info, y_info) in enumerate(tqdm(dataloader, desc="Evaluate", unit="batch", position=1, leave=False)):
         
         hyp = model(x_info)
         preds = model.predict(hyp, y_info.pos_modes)
@@ -223,5 +247,13 @@ def evaluate(
             y_info.q_types,
             )
         classif_data.include(results)
+
+        # Add the average of the fractions of predicted answers respective to the total number of typed entities
+        if epoch is not None:
+            answer_sizes[batch_id] = np.mean([len(a)/len(model.nodes_per_mode[m]) for a, m in zip(preds, y_info.pos_modes)])
+
+    # Log the average answer size from all batches
+    if epoch is not None:
+        wandb.log({"val": {"mean_answer_size": np.mean(answer_sizes), "epoch_id": epoch}})
 
     return classif_data.finalize()
