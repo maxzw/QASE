@@ -20,7 +20,8 @@ def _train_epoch(
     model: AnswerSpaceModel,
     dataloader: DataLoader,
     loss_fn: AnswerSpaceLoss,
-    optimizer: torch.optim.Optimizer
+    optimizer: torch.optim.Optimizer,
+    epoch: int
     ) -> Tensor:
     """Train the model for one epoch."""
     
@@ -34,7 +35,7 @@ def _train_epoch(
     
     x_info: QueryBatchInfo
     y_info: QueryTargetInfo
-    for x_info, y_info in tqdm(dataloader, desc="Epoch", unit="batch", position=1, leave=False):
+    for batch_nr, (x_info, y_info) in enumerate(tqdm(dataloader, desc="Epoch", unit="batch", position=1, leave=False)):
         
         optimizer.zero_grad()
         hyp = model(x_info)
@@ -44,7 +45,9 @@ def _train_epoch(
         optimizer.step()
         
         loss_val = loss.detach().item()
-        wandb.log({"train": {"batch": {"batch_loss": loss_val, "batch_p_dist": p_dist, "batch_n_dist": n_dist}}})
+        
+        curr_batch = epoch * len(dataloader) + batch_nr
+        wandb.log({"train": {"batch": {"batch_loss": loss_val, "batch_p_dist": p_dist, "batch_n_dist": n_dist, "batch_id": curr_batch}}})
 
         batch_losses.append(loss_val)
         pos_distances.append(p_dist)
@@ -55,7 +58,7 @@ def _train_epoch(
     mean_dist_n = np.mean(neg_distances)
     
     logger.info(f"Mean epoch loss: {mean_loss:.5f} ({mean_dist_p:.5f} - {mean_dist_n:.5f})")
-    wandb.log({"train": {"epoch": {"mean_loss": mean_loss, "mean_loss_p": mean_dist_p, "mean_loss_n": mean_dist_n}}})
+    wandb.log({"train": {"epoch": {"mean_loss": mean_loss, "mean_loss_p": mean_dist_p, "mean_loss_n": mean_dist_n, "epoch_id": epoch}}})
     return mean_loss
 
 
@@ -81,7 +84,8 @@ def train(
             model,
             train_dataloader,
             loss_fn,
-            optimizer
+            optimizer,
+            epoch
             )
         epoch_losses.append(epoch_loss)
 
@@ -93,6 +97,6 @@ def train(
                 )
             val_report.include(val_results, {'epoch': epoch})
             logger.info(f"Validation results: {val_results}")
-            wandb.log({"val": {**val_results}})
+            wandb.log({"val": {**val_results,  **{"epoch_id:": epoch}}})
 
     return epoch_losses, val_report.src

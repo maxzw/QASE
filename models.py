@@ -283,6 +283,7 @@ class HypewiseGCN(AnswerSpaceModel):
 
         # TODO: Think about doing it batch-wise with the embeddings that apply to
         # this specific target mode, to save GPU memory.
+        # For instance with doing the calculation below but grouped per mode
 
         with torch.no_grad():
 
@@ -319,6 +320,9 @@ class HypewiseGCN(AnswerSpaceModel):
                     if ent_ind and (ent_idx in self.nodes_per_mode[modes[batch_idx]]):
                         # we add the entity index (=ID) to the answer list for that batch
                         answers[batch_idx].append(ent_idx)
+        
+        # TODO: log the size of the predicted entities, to see if the cone
+        # narrows down over time. (but only runs with eval batch, how to aggregate mean?)
         
         assert len(answers) == len(modes) == hyp.size(0)
         return answers
@@ -360,4 +364,5 @@ class BandwiseGCN(AnswerSpaceModel):
 
         data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
 
+        # TODO: Implement
         raise NotImplementedError

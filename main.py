@@ -49,6 +49,8 @@ parser.add_argument("--early_stop",     type=bool,  default=True,       help="If
 parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
 args = parser.parse_args()
 
+# TODO: nest arguments + come up with 'main' function that can be called in hpo
+
 # Check argument combinations
 # TODO
 
