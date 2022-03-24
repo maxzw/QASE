@@ -4,7 +4,9 @@ import logging
 from abc import abstractmethod
 import pickle
 import random
+import time
 from typing import Sequence, Tuple
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -280,51 +282,65 @@ class HypewiseGCN(AnswerSpaceModel):
         ) -> Sequence[Sequence[int]]:
 
         answers = [[] for _ in range(len(modes))]
-
-        # TODO: Think about doing it batch-wise with the embeddings that apply to
-        # this specific target mode, to save GPU memory.
-        # For instance with doing the calculation below but grouped per mode
+        answers1 = [[] for _ in range(len(modes))]
 
         with torch.no_grad():
 
-            # add extra dimension for broadcasting:  
-            # from  (batch_size, num_bands, band_size, embed_dim)
-            # to    (batch_size, 1, num_bands, band_size, embed_dim)       
-            hyp_1 = hyp.reshape(hyp.size(0), 1, hyp.size(1), hyp.size(2), hyp.size(3))            
-            
-            # add extra dimension for broadcasting:  
-            # from  (num_ents, embed_dim)
-            # to    (1, num_ents, 1, 1, embed_dim)
-            emb = self.ent_features.weight.to(self.device)
-            emb_1 = emb.reshape(1, emb.size(0), 1, 1, emb.size(1))
+            for mode in set(modes):
 
-            # calculate dot products of hyperplanes-embeddings
-            # and convert positive/negative dot products to binary values
-            # shape: (batch_size, num_ents, num_bands, band_size)
-            dot_inds = (torch.sum(hyp_1 * emb_1, dim=-1) > 0)
+                # batch indices that have this target mode
+                batch_mode_idx = torch.from_numpy(np.where(np.array(modes) == mode)[0])
+                print(batch_mode_idx)
 
-            # only if all hyperplanes in a band are positive and the band contains the answer
-            # shape: (batch_size, num_ents, num_bands)
-            band_inds = torch.all(dot_inds, dim=3)
+                # select queries with this mode:
+                # (batch_size_mode, num_bands, band_size, embed_dim)
+                mode_hyp = torch.index_select(hyp, 0, batch_mode_idx) 
+                print(mode_hyp.size()) # [28, 6, 4, 128]
 
-            # if any band contains the entity, then the entity is a predicted answer
-            # shape: (batch_size, num_ents)
-            ent_inds = torch.any(band_inds, dim=2)
+                # select entity embeddings with this mode:
+                # (num_ents_mode, embed_dim)
+                mode_emb = self.ent_features(torch.tensor(self.nodes_per_mode[mode])).to(self.device)
+                print(mode_emb.size()) # [146, 128]
 
-            # iterate through all batches
-            for batch_idx, batch in enumerate(ent_inds):
-                # for all entities for that batch
-                for ent_idx, ent_ind in enumerate(batch):
-                    # if the entity indicator is 1 (is in any band's answer space)
-                    # and entity index (=ID) is of correct type
-                    if ent_ind and (ent_idx in self.nodes_per_mode[modes[batch_idx]]):
-                        # we add the entity index (=ID) to the answer list for that batch
-                        answers[batch_idx].append(ent_idx)
-        
-        # TODO: log the size of the predicted entities, to see if the cone
-        # narrows down over time. (but only runs with eval batch, how to aggregate mean?)
-        
+                # add extra dimension to hyperplanes for broadcasting:  
+                # from  (batch_size_mode, num_bands, band_size, embed_dim)
+                # to    (batch_size_mode, 1, num_bands, band_size, embed_dim)       
+                mode_hyp_1 = mode_hyp.reshape(mode_hyp.size(0), 1, mode_hyp.size(1), mode_hyp.size(2), mode_hyp.size(3))          
+                print(mode_hyp_1.size()) # [28, 1, 6, 4, 128]
+
+                # add extra dimension for broadcasting:  
+                # from  (num_ents_mode, embed_dim)
+                # to    (1, num_ents_mode, 1, 1, embed_dim)
+                mode_emb_1 = mode_emb.reshape(1, mode_emb.size(0), 1, 1, mode_emb.size(1))
+                print(mode_emb_1.size()) # [1, 146, 1, 1, 128]
+
+                # calculate dot products of hyperplanes-embeddings
+                # and convert positive/negative dot products to binary values
+                # shape: (batch_size_mode, num_ents_mode, num_bands, band_size)
+                dot_inds = (torch.sum(mode_hyp_1 * mode_emb_1, dim=-1) > 0)
+                print(dot_inds.size()) # [28, 146, 6, 4]
+
+                # only if all hyperplanes in a band are positive and the band contains the answer
+                # shape: (batch_size_mode, num_ents_mode, num_bands)
+                band_inds = torch.all(dot_inds, dim=-1)
+                print(band_inds.size()) # [28, 146, 6]
+
+                # if any band contains the entity, then the entity is a predicted answer
+                # shape: (batch_size_mode, num_ents_mode)
+                ent_inds = torch.any(band_inds, dim=-1)
+                print(ent_inds.size()) # [28, 146]
+
+                # iterate through all batches
+                for batch_idx, batch in zip(batch_mode_idx, ent_inds):
+                    # for all entities for that batch
+                    for ent_idx, ent_ind in enumerate(batch):
+                        # if the entity indicator is True (is in any band's answer space)
+                        if ent_ind:
+                            # we add the global(!) entity index (=ID) to the answer list for that batch
+                            answers[batch_idx].append(self.nodes_per_mode[mode][ent_idx])
+                
         assert len(answers) == len(modes) == hyp.size(0)
+
         return answers
 
 
