@@ -19,8 +19,8 @@ parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Wh
 # parser.add_argument("--load_best",      type=bool,  default=False,      help="If best model for this dataset should be loaded")
 parser.add_argument("--model",          type=str,   default="bandwise", help="Which model to use: ['hypewise', 'bandwise']")
 parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension of the entities and relations")
-parser.add_argument("--num_bands",      type=int,   default=6,          help="The number of bands")
-parser.add_argument("--band_size",      type=int,   default=4,          help="The size of the bands (number of hyperplanes per band)")
+parser.add_argument("--num_bands",      type=int,   default=4,          help="The number of bands")
+parser.add_argument("--band_size",      type=int,   default=8,          help="The size of the bands (number of hyperplanes per band)")
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
@@ -29,11 +29,10 @@ parser.add_argument("--gcn_pool",       type=str,   default="tm",       help="Gr
 parser.add_argument("--gcn_comp",       type=str,   default="mult",     help="Composition operator: ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot']")
 parser.add_argument("--gcn_use_bias",   type=bool,  default=True,       help="If convolution layer contains bias")
 parser.add_argument("--gcn_use_bn",     type=bool,  default=True,       help="If convolution layer contains batch normalization")
-parser.add_argument("--gcn_dropout",    type=float, default=0.3,        help="If convolution layer contains dropout")
+parser.add_argument("--gcn_dropout",    type=float, default=0.5,        help="If convolution layer contains dropout")
 parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="If the weights of the convolution layer are shared within a GCN")
 
 # Loss parameters
-parser.add_argument("--dist",           type=str,   default="sigm",     help="The distance function used in the loss: ['sigm', 'invlrelu']")
 parser.add_argument("--loss_aggr",      type=str,   default="min",      help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
 
 # Optimizer parameters
@@ -46,7 +45,7 @@ parser.add_argument("--lr",             type=float, default=1e-3,       help="Le
 parser.add_argument("--num_epochs",     type=int,   default=50,         help="Number of training epochs")
 parser.add_argument("--val_freq",       type=int,   default=1,          help="Validation frequency (epochs)")
 parser.add_argument("--min_epochs",     type=int,   default=5,          help="The minimal number of epochs to train (only relevant in combination with early stopping)")
-parser.add_argument("--early_stop",     type=int,   default=None,       help="Number of rounds after training is stopped when loss does not go down")
+parser.add_argument("--early_stop",     type=int,   default=10000,       help="Number of rounds after training is stopped when loss does not go down")
 # parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
 args = parser.parse_args()
 
@@ -75,9 +74,7 @@ model = AnswerSpaceModel(
 # logging.info(f"Model: {model}")
 
 # Define loss function
-loss_fn = AnswerSpaceLoss(
-    dist_func=args.dist,
-    aggr=args.loss_aggr)
+loss_fn = AnswerSpaceLoss(args.loss_aggr)
 logging.info(f"Loss: {loss_fn}")
 
 # Define optimizer

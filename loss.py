@@ -9,8 +9,7 @@ from torch import Tensor
 
 class BandDistance(nn.Module):
     """
-    Distance function between answer space and entity embedding
-    based on their dot product.
+    Distance function between answer space and entity embedding.
     """
     
     @abstractmethod
@@ -33,39 +32,19 @@ class BandDistance(nn.Module):
 
 class SigmoidDistance(BandDistance):
 
-    def forward(self, x):
+    def forward(self, x: Tensor, pos: bool = True) -> Tensor:
         
         # apply sigmoid to map values to range [0, 1]
         a = torch.sigmoid(x)
 
-        # we want all dot products to be positive, for simplicity we want them to be much higher
-        # mapping them to 1. The band-wise distance can therefore be calculated as the difference
-        # between perfect score [1, 1, ..., 1] and the activated dot product
-        return 1 - torch.mean(a, dim=-1)
-
-
-class InvLReLUDistance(BandDistance):
-    
-    def __init__(self, pos_slope=1e-3) -> None:
-        super().__init__()
-        self.pos_slope = pos_slope
-
-    def _inv_leakyReLU(self, x):
-        return -torch.minimum(x, torch.tensor(0)) - self.pos_slope * torch.maximum(torch.tensor(0), x)
-
-    def forward(self, x):
-        
-        # get approximate signature using mirrored leaky ReLU activation
-        a = self._inv_leakyReLU(x)
-        
-        # calculate band-wise distance with perfect score: [+, +, ..., +]
-        # to    (batch_size, num_bands)
-        s = torch.sum(a, dim=-1)
-
-        return s
-
-    def __repr__(self):
-	    return '{}(slope={})'.format(self.__class__.__name__, self.pos_slope)
+        # For true samples we want all dot products to be positive, for simplicity
+        # we want them to be much higher mapping them to 1. The band-wise distance 
+        # can therefore be calculated as the difference between perfect score 
+        # [1, 1, ..., 1] and the activated dot product
+        if pos:
+            return 1 - torch.mean(a, dim=-1)
+        else:
+            return 1 - torch.min(a, dim=-1)
 
 
 # ---------- Classes for calculating hyperplane diversity ----------
@@ -78,24 +57,16 @@ class InvLReLUDistance(BandDistance):
 
 class AnswerSpaceLoss(nn.Module):
     """A loss for answer space."""
-    def __init__(
-        self,
-        dist_func: str = 'sigm',
-        aggr: str = 'softmin'
-        ):
+    def __init__(self, aggr: str = 'softmin'):
         super().__init__()
-        assert dist_func in ['sigm', 'invlrelu']
-        self.distance = dist_func
         assert aggr in ['min', 'mean', 'softmin']
         self.aggr = aggr
 
-        # Define distance functions and softmin if required
-        if dist_func == "sigm":
-            self.distance = SigmoidDistance()
-        elif dist_func == "invlrelu":
-            self.distance = InvLReLUDistance()
+        # Define softmin if required
+        self.distance = SigmoidDistance()
         if aggr == 'softmin':
             self.sm = nn.Softmin(dim=-1)
+
 
     def _calc_dot(self, hyp: Tensor, y: Tensor):
         """Calculated dot product between hyperplanes and entity."""
@@ -111,6 +82,7 @@ class AnswerSpaceLoss(nn.Module):
         
         return dot
 
+
     def forward(
         self,
         hyp: Tensor,
@@ -121,7 +93,7 @@ class AnswerSpaceLoss(nn.Module):
         # calculate distance per band for true and false samples:
         # (batch_size, num_bands)
         d_true = self.distance(self._calc_dot(hyp, pos_embeds))
-        d_false = self.distance(self._calc_dot(hyp, neg_embeds))
+        d_false = self.distance(self._calc_dot(hyp, neg_embeds, pos=False))
         
         # aggregate the band-wise losses for positive samples. We only need one band to 
         # contain the answer, so we use a trade-off between exploration and exploitation.
