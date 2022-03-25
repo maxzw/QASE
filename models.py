@@ -257,7 +257,7 @@ class AnswerSpaceModel(nn.Module):
             for mode in set(modes):
 
                 # batch indices that have this target mode
-                batch_mode_idx = torch.from_numpy(np.where(np.array(modes) == mode)[0])
+                batch_mode_idx = torch.from_numpy(np.where(np.array(modes) == mode)[0]).to(self.device)
 
                 # select queries with this mode:
                 # (batch_size_mode, num_bands, band_size, embed_dim)
