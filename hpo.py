@@ -34,6 +34,9 @@ def objective(
 
     # Suggest parameters
     args=None
+    # all is 3 layers
+    # hypewise shared(+/-) + stop_dia(+/-)
+    # bandwise (or set shard + stop_dia to false here)
 
     # Initialize WandB logging
     wandb.login()

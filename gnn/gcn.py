@@ -23,10 +23,13 @@ class GCNModel(nn.Module):
         use_bn: bool = True,
         dropout: float = 0.0,
         share_weights: bool = True,
-        device=None
+        device = None
         ):
         super().__init__()
         self.layer_dims = layer_dims
+        if stop_at_diameter:
+            assert len(set(self.layer_dims)) == 1, \
+            f"Can only stop at diameter when using constant layer dimensions!"
         self.stop_at_diameter = stop_at_diameter
         assert pool in ['max', 'sum', 'tm'], \
             f"Readout function {pool} is not implemented!"

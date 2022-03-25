@@ -80,13 +80,20 @@ class AnswerSpaceLoss(nn.Module):
     """A loss for answer space."""
     def __init__(
         self,
-        dist_func: BandDistance,
+        dist_func: str = 'sigm',
         aggr: str = 'softmin'
         ):
         super().__init__()
+        assert dist_func in ['sigm', 'invlrelu']
         self.distance = dist_func
         assert aggr in ['min', 'mean', 'softmin']
         self.aggr = aggr
+
+        # Define distance functions and softmin if required
+        if dist_func == "sigm":
+            self.distance = SigmoidDistance()
+        elif dist_func == "invlrelu":
+            self.distance = InvLReLUDistance()
         if aggr == 'softmin':
             self.sm = nn.Softmin(dim=-1)
 

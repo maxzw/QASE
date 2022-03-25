@@ -4,7 +4,6 @@ import logging
 import pickle
 import random
 import numpy as np
-from abc import abstractmethod
 from typing import Sequence, Tuple
 
 import torch
@@ -20,11 +19,73 @@ logger = logging.getLogger(__name__)
 
 class AnswerSpaceModel(nn.Module):
     """Abstract class for embedding queries into sets of hyperplanes."""
-    def __init__(self, data_dir, embed_dim, device):
+    def __init__(
+        self,
+        data_dir: str,
+        method: str,
+        embed_dim: int,
+        device,
+        num_bands: int,
+        band_size: int,
+        gcn_layers: int,
+        gcn_stop_at_diameter: bool,
+        gcn_pool: str,
+        gcn_comp: str,
+        gcn_use_bias: bool,
+        gcn_use_bn: bool,
+        gcn_dropout: float,
+        gcn_share_weights: bool
+        ):
         super().__init__()
+        
+        # Build embeddings
         self.data_dir = data_dir
         self.embed_dim = embed_dim
         self.device = device
+        self._build_embeddings()
+
+        # Meta info
+        self.method = method
+        self.num_bands = num_bands
+        self.band_size = band_size
+
+        # GCN info
+        self.gcn_layers = gcn_layers
+        self.gcn_stop_at_diameter = gcn_stop_at_diameter
+        self.gcn_pool = gcn_pool
+        self.gcn_comp = gcn_comp
+        self.gcn_use_bias = gcn_use_bias
+        self.gcn_use_bn = gcn_use_bn
+        self.gcn_dropout = gcn_dropout
+        self.gcn_share_weights = gcn_share_weights
+
+        # Define number of GCN models and layer dimensions based on method
+        if self.method == 'hypewise':
+            self.num_GCN_models = self.num_bands * self.band_size
+            self.layer_dims = [self.embed_dim for _ in range(self.gcn_layers + 1)]
+        elif self.method == 'bandwise':
+            self.num_GCN_models = self.num_bands
+            # Increase layer dimensions linearly from embed_dim to embed_dim*band_size with
+            # number of steps equal to the number of layers + 1.
+            self.layer_dims = [int(v) for v in np.linspace(
+                self.embed_dim, self.embed_dim * self.band_size, self.gcn_layers + 1)] 
+
+        # Instantiate GCN models
+        self.submodels = nn.ModuleList([
+            GCNModel(
+                layer_dims          = self.layer_dims,
+                stop_at_diameter    = self.gcn_stop_at_diameter,
+                pool                = self.gcn_pool,
+                comp                = self.gcn_comp,
+                use_bias            = self.gcn_use_bias,
+                use_bn              = self.gcn_use_bn,
+                dropout             = self.gcn_dropout,
+                share_weights       = self.gcn_share_weights,
+                device              = self.device
+                ) for _ in range(self.num_GCN_models)
+        ])
+        logging.info(f"Based on method '{self.method}' build {self.num_GCN_models} GCN models ({self.layer_dims}, shared weights={self.gcn_share_weights})")
+
 
     def _build_embeddings(self):
         """
@@ -47,10 +108,10 @@ class AnswerSpaceModel(nn.Module):
 
         # create entity and variable embeddings
         self.ent_features = nn.Embedding(self.num_nodes, self.embed_dim)
-        self.ent_features.weight.data.normal_(0, 1./self.embed_dim)
+        self.ent_features.weight.data.normal_()
         logger.info(f"Created entity embeddings: {self.ent_features}")
         self.var_features = nn.Embedding(len(node_maps), self.embed_dim)
-        self.var_features.weight.data.normal_(0, 1./self.embed_dim)
+        self.var_features.weight.data.normal_()
         logger.info(f"Created variable embeddings: {self.var_features}")
 
         # create mapping from variable mode to variable ID
@@ -70,7 +131,7 @@ class AnswerSpaceModel(nn.Module):
 
         # create relation embeddings
         self.rel_features = nn.Embedding(num_rels, self.embed_dim)
-        self.rel_features.weight.data.normal_(0, 1./self.embed_dim)
+        self.rel_features.weight.data.normal_()
         logger.info(f"Created relation embeddings: {self.rel_features}")
 
     
@@ -242,7 +303,6 @@ class AnswerSpaceModel(nn.Module):
         return answers
 
 
-    @abstractmethod
     def forward(self, batch: QueryBatchInfo) -> Tensor:
         """
         First embeds and then forwards the query graph batch through the GCN submodels.
@@ -256,131 +316,6 @@ class AnswerSpaceModel(nn.Module):
                 Collection of hyperplanes that demarcate the answer space.
         """
         data: VectorizedQueryBatch = self.vectorize_batch(batch)
-        raise NotImplementedError
-
-
-# TODO: combine two below classes into one (then we can also combine the top one... :-D )
-
-
-class HypewiseGCN(AnswerSpaceModel):
-    """Uses one GCN for every hyperplane"""
-    def __init__(
-        self,
-        data_dir: str,
-        embed_dim: int,
-        device,
-        num_bands: int,
-        band_size: int,
-        gcn_layers: int,
-        gcn_stop_at_diameter: bool,
-        gcn_pool: str,
-        gcn_comp: str,
-        gcn_use_bias: bool,
-        gcn_use_bn: bool,
-        gcn_dropout: float,
-        gcn_share_weights: bool
-        ):
-        
-        # initiate superclass and build embeddings
-        super().__init__(data_dir, embed_dim, device)
-        self._build_embeddings()
-
-        # meta info
-        self.num_bands = num_bands
-        self.band_size = band_size
-
-        # gcn info
-        self.gcn_layers = gcn_layers
-        self.gcn_stop_at_diameter = gcn_stop_at_diameter
-        self.gcn_pool = gcn_pool
-        self.gcn_comp = gcn_comp
-        self.gcn_use_bias = gcn_use_bias
-        self.gcn_use_bn = gcn_use_bn
-        self.gcn_dropout = gcn_dropout
-        self.gcn_share_weights = gcn_share_weights
-
-        # instantiate GCN models
-        self.submodels = nn.ModuleList([
-            GCNModel(
-                layer_dims          = [self.embed_dim for _ in range(gcn_layers + 1)],
-                stop_at_diameter    = self.gcn_stop_at_diameter,
-                pool                = gcn_pool,
-                comp                = self.gcn_comp,
-                use_bias            = self.gcn_use_bias,
-                use_bn              = self.gcn_use_bn,
-                dropout             = self.gcn_dropout,
-                share_weights       = self.gcn_share_weights,
-                device              = self.device
-                ) for _ in range(self.num_bands * self.band_size)
-        ])
-
-
-    def forward(self, x_batch: QueryBatchInfo) -> Tensor:
-        # output should be in shape (batch_size, num_bands, band_size, embed_dim)
-
-        data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
-        
-        return torch.cat([gcn(data) for gcn in self.submodels], dim=-1).reshape(
-            data.batch_size, self.num_bands, self.band_size, self.embed_dim)
-
-
-class BandWiseGCN(AnswerSpaceModel):
-    """Uses one GCN for every band"""
-    def __init__(
-        self,
-        data_dir: str,
-        embed_dim: int,
-        device,
-        num_bands: int,
-        band_size: int,
-        layer_dims: int,
-        gcn_stop_at_diameter: bool,
-        gcn_pool: str,
-        gcn_comp: str,
-        gcn_use_bias: bool,
-        gcn_use_bn: bool,
-        gcn_dropout: float,
-        gcn_share_weights: bool
-        ):
-        
-        # initiate superclass and build embeddings
-        super().__init__(data_dir, embed_dim, device)
-        self._build_embeddings()
-
-        # meta info
-        self.num_bands = num_bands
-        self.band_size = band_size
-
-        # gcn info
-        self.layer_dims = layer_dims
-        self.gcn_stop_at_diameter = gcn_stop_at_diameter
-        self.gcn_pool = gcn_pool
-        self.gcn_comp = gcn_comp
-        self.gcn_use_bias = gcn_use_bias
-        self.gcn_use_bn = gcn_use_bn
-        self.gcn_dropout = gcn_dropout
-        self.gcn_share_weights = gcn_share_weights
-
-        # instantiate GCN models
-        self.submodels = nn.ModuleList([
-            GCNModel(
-                layer_dims          = self.layer_dims,
-                stop_at_diameter    = self.gcn_stop_at_diameter,
-                pool                = gcn_pool,
-                comp                = self.gcn_comp,
-                use_bias            = self.gcn_use_bias,
-                use_bn              = self.gcn_use_bn,
-                dropout             = self.gcn_dropout,
-                share_weights       = self.gcn_share_weights,
-                device              = self.device
-                ) for _ in range(self.num_bands)
-        ])
-
-
-    def forward(self, x_batch: QueryBatchInfo) -> Tensor:
-        # output should be in shape (batch_size, num_bands, band_size, embed_dim)
-
-        data: VectorizedQueryBatch = self.vectorize_batch(x_batch)
         
         return torch.cat([gcn(data) for gcn in self.submodels], dim=-1).reshape(
             data.batch_size, self.num_bands, self.band_size, self.embed_dim)
