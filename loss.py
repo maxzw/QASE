@@ -44,7 +44,7 @@ class SigmoidDistance(BandDistance):
         if pos:
             return 1 - torch.mean(a, dim=-1)
         else:
-            return 1 - torch.min(a, dim=-1)
+            return 1 - torch.min(a, dim=-1).values
 
 
 # ---------- Classes for calculating hyperplane diversity ----------
