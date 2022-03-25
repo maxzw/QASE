@@ -93,7 +93,7 @@ class AnswerSpaceLoss(nn.Module):
         # calculate distance per band for true and false samples:
         # (batch_size, num_bands)
         d_true = self.distance(self._calc_dot(hyp, pos_embeds))
-        d_false = self.distance(self._calc_dot(hyp, neg_embeds, pos=False))
+        d_false = self.distance(self._calc_dot(hyp, neg_embeds), pos=False)
         
         # aggregate the band-wise losses for positive samples. We only need one band to 
         # contain the answer, so we use a trade-off between exploration and exploitation.
