@@ -40,7 +40,8 @@ class GCNModel(nn.Module):
         self.use_bias = use_bias
         self.use_bn = use_bn
         self.dropout = dropout
-        assert (len(set(self.layer_dims)) == 1) == share_weights, \
+        if share_weights:
+            assert (len(set(self.layer_dims)) == 1), \
             f"Cannot share weights while using varying layer dimensions!"
         self.share_weights = share_weights
         self.device = device       

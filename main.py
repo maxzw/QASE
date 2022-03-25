@@ -17,14 +17,14 @@ parser = ArgumentParser()
 # Dataset & model parameters
 parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Which dataset to use: ['AIFB', 'AM', 'BIO', 'MUTAG']")
 # parser.add_argument("--load_best",      type=bool,  default=False,      help="If best model for this dataset should be loaded")
-parser.add_argument("--model",          type=str,   default="bandwise", help="Which model to use: ['hypewise', 'bandwise']")
+parser.add_argument("--model",          type=str,   default="hypewise", help="Which model to use: ['hypewise', 'bandwise']")
 parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension of the entities and relations")
-parser.add_argument("--num_bands",      type=int,   default=4,          help="The number of bands")
-parser.add_argument("--band_size",      type=int,   default=8,          help="The size of the bands (number of hyperplanes per band)")
+parser.add_argument("--num_bands",      type=int,   default=8,          help="The number of bands")
+parser.add_argument("--band_size",      type=int,   default=16,          help="The size of the bands (number of hyperplanes per band)")
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
-parser.add_argument("--gcn_stop_dia",   type=bool,  default=False,      help="If message passing stopping stops when number of passes equals query diameter")
+parser.add_argument("--gcn_stop_dia",   type=bool,  default=True,      help="If message passing stopping stops when number of passes equals query diameter")
 parser.add_argument("--gcn_pool",       type=str,   default="tm",       help="Graph pooling operator: ['max', 'sum', 'tm']")
 parser.add_argument("--gcn_comp",       type=str,   default="mult",     help="Composition operator: ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot']")
 parser.add_argument("--gcn_use_bias",   type=bool,  default=True,       help="If convolution layer contains bias")
