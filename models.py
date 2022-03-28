@@ -107,11 +107,11 @@ class AnswerSpaceModel(nn.Module):
         self.num_nodes = sum(node_mode_counts.values())
 
         # create entity and variable embeddings
-        self.ent_features = nn.Embedding(self.num_nodes, self.embed_dim)
-        self.ent_features.weight.data.normal_()
+        self.ent_features = nn.Embedding(self.num_nodes, self.embed_dim) #, max_norm=1)
+        # self.ent_features.weight.data.normal_(0, 1/self.embed_dim)
         logger.info(f"Created entity embeddings: {self.ent_features}")
-        self.var_features = nn.Embedding(len(node_maps), self.embed_dim)
-        self.var_features.weight.data.normal_()
+        self.var_features = nn.Embedding(len(node_maps), self.embed_dim) #, max_norm=1)
+        # self.var_features.weight.data.normal_(0, 1/self.embed_dim)
         logger.info(f"Created variable embeddings: {self.var_features}")
 
         # create mapping from variable mode to variable ID
@@ -130,8 +130,8 @@ class AnswerSpaceModel(nn.Module):
         self.rel_maps = rel_maps
 
         # create relation embeddings
-        self.rel_features = nn.Embedding(num_rels, self.embed_dim)
-        self.rel_features.weight.data.normal_()
+        self.rel_features = nn.Embedding(num_rels, self.embed_dim) #, max_norm=1)
+        # self.rel_features.weight.data.normal_(0, 1/self.embed_dim)
         logger.info(f"Created relation embeddings: {self.rel_features}")
 
     
@@ -139,11 +139,11 @@ class AnswerSpaceModel(nn.Module):
         return self.ent_features(nodes)
 
 
-    def embed_vars(self, mode: str) -> Tensor:
+    def embed_var(self, mode: str) -> Tensor:
         return self.var_features(torch.tensor(self.var_maps[mode]))
 
 
-    def embed_rels(self, rel_type: Tuple[str, str, str]) -> Tensor:
+    def embed_rel(self, rel_type: Tuple[str, str, str]) -> Tensor:
         return self.rel_features(torch.tensor(self.rel_maps[rel_type]))
 
 
@@ -161,7 +161,7 @@ class AnswerSpaceModel(nn.Module):
         ent_embed = torch.empty((batch.ent_ids.size(0), self.embed_dim))
         for i, (id, mode) in enumerate(zip(batch.ent_ids, batch.ent_modes)):
             if id == -1: # means variable
-                emb = self.embed_vars(mode)
+                emb = self.embed_var(mode)
             else:
                 emb = self.embed_ents(id)
             ent_embed[i] = emb
@@ -176,9 +176,9 @@ class AnswerSpaceModel(nn.Module):
         for i, id in enumerate(batch.edge_ids):
             if id not in all_ids:
                 # add to regular edges (stored as inverse initially)
-                reg_rel_embed[len(all_ids)] = self.embed_rels(_reverse_relation(id))
+                reg_rel_embed[len(all_ids)] = self.embed_rel(_reverse_relation(id))
                 # add to inverse edges
-                inv_rel_embed[len(all_ids)] = self.embed_rels(id)
+                inv_rel_embed[len(all_ids)] = self.embed_rel(id)
                 # keep track of known edges
                 edge_type[i] = len(all_ids)
                 all_ids.append(id)
