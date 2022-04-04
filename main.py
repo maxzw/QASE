@@ -50,8 +50,6 @@ parser.add_argument("--early_stop",     type=int,   default=10000,       help="N
 # parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
 args = parser.parse_args()
 
-print(sys.modules)
-
 # Create logger
 create_logger(args.dataset)
 logging.info(f"Training on dataset: {args.dataset}")

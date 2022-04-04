@@ -2,14 +2,7 @@
 
 import wandb
 import logging
-
-import sys
-if 'google.colab' in sys.modules:
-    print("Running in Colab")
-    from tqdm.notebook import tqdm
-else:
-    print("NOT running in Colab")
-    from tqdm import tqdm
+from tqdm.notebook import tqdm
         
 import numpy as np
 from pandas import DataFrame
