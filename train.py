@@ -4,10 +4,12 @@ import wandb
 import optuna
 import logging
 
-import os
-if 'COLAB_GPU' in os.environ:
+import sys
+if 'google.colab' in sys.modules:
+    print("Running in Colab")
     from tqdm.notebook import tqdm
 else:
+    print("NOT running in Colab")
     from tqdm import tqdm
 
 import numpy as np
