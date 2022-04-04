@@ -121,6 +121,7 @@ class ClassificationData:
             global_accuracy_w += metrics['acc']
             global_precision_w += metrics['pre']
             global_recall_w += metrics['rec']
+            # add mean values to output dict
             for metric, values in metrics.items():
                 self.src[structure][metric] = np.mean(values)
             # add structure-specific f1-score
@@ -128,10 +129,10 @@ class ClassificationData:
                 (self.src[structure]['pre']*self.src[structure]['rec'])
                 /(self.src[structure]['pre']+self.src[structure]['rec'])) \
                     if (self.src[structure]['pre']+self.src[structure]['rec']) > 0 else 0
-            # add [means] to regular mean lists
-            global_accuracy_m += [metrics['acc']]
-            global_precision_m += [metrics['pre']]
-            global_recall_m += [metrics['rec']]
+            # add means to macro mean lists
+            global_accuracy_m.append(metrics['acc'])
+            global_precision_m.append(metrics['pre'])
+            global_recall_m.append(metrics['rec'])
 
         self.src['macro'] = {}
         self.src['macro']['acc'] = np.mean(global_accuracy_m)
@@ -201,9 +202,9 @@ def classification_metrics(
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
 
-        results[q_type]['acc'] += [accuracy]
-        results[q_type]['pre'] += [precision]
-        results[q_type]['rec'] += [recall]
+        results[q_type]['acc'].append(accuracy)
+        results[q_type]['pre'].append(precision)
+        results[q_type]['rec'].append(recall)
     
     return dict(results)
 
