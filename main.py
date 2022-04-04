@@ -83,7 +83,7 @@ if args.optim == "adam":
 elif args.optim == "sgd":
     optimizer = torch.optim.sgd(model.parameters(), args.lr)
 logging.info(f"Optimizer: {optimizer}")
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, factor=0.5)
 
 # Load queries
 exclude = ['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter']
