@@ -3,7 +3,7 @@
 import wandb
 import optuna
 import logging
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 import numpy as np
 from pandas import DataFrame
