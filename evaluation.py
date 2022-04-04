@@ -126,7 +126,8 @@ class ClassificationData:
             # add structure-specific f1-score
             self.src[structure]['f1'] = 2*(
                 (self.src[structure]['pre']*self.src[structure]['rec'])
-                /(self.src[structure]['pre']+self.src[structure]['rec']))
+                /(self.src[structure]['pre']+self.src[structure]['rec'])) \
+                    if (self.src[structure]['pre']+self.src[structure]['rec']) > 0 else 0
             # add [means] to regular mean lists
             global_accuracy_m += [metrics['acc']]
             global_precision_m += [metrics['pre']]
@@ -138,7 +139,8 @@ class ClassificationData:
         self.src['macro']['rec'] = np.mean(global_recall_m)
         self.src['macro']['f1'] = 2*(
             (self.src['macro']['pre']*self.src['macro']['rec'])
-            /(self.src['macro']['pre']+self.src['macro']['rec']))
+            /(self.src['macro']['pre']+self.src['macro']['rec'])) \
+                if (self.src['macro']['pre']+self.src['macro']['rec']) > 0 else 0
 
         self.src['weighted'] = {}
         self.src['weighted']['acc'] = np.mean(global_accuracy_w)
@@ -146,7 +148,8 @@ class ClassificationData:
         self.src['weighted']['rec'] = np.mean(global_recall_w)
         self.src['weighted']['f1'] = 2*(
              (self.src['weighted']['pre']*self.src['weighted']['rec'])
-            /(self.src['weighted']['pre']+self.src['weighted']['rec']))
+            /(self.src['weighted']['pre']+self.src['weighted']['rec'])) \
+                if (self.src['weighted']['pre']+self.src['weighted']['rec']) > 0 else 0
 
         return dict(self.src)
 
