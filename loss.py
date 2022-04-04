@@ -1,23 +1,24 @@
 """Loss functions for hyperplane configurations"""
+import random
+from typing import Sequence
 from abc import abstractmethod
+
 import torch
 import torch.nn as nn
 from torch import Tensor
 
 
-# ---------- Classes for calculating distance ----------
+class AnswerSpaceLoss(nn.Module):
+    """An LSH-inspired loss for query answer spaces."""
+    def __init__(self) -> None:
+        super().__init__()
 
-class BandDistance(nn.Module):
-    """
-    Distance function between answer space and entity embedding.
-    """
-    
     @abstractmethod
     def forward(
         self,
         x: Tensor
         ) -> Tensor:
-        """_summary_
+        """Calculates the loss for an answer space.
 
         Args:
             x (Tensor): Shape (batch_size, num_bands, num_hyperplanes).
@@ -30,58 +31,18 @@ class BandDistance(nn.Module):
         raise NotImplementedError
 
 
-class SigmoidDistance(BandDistance):
-
-    def forward(self, x: Tensor, pos: bool = True) -> Tensor:
-        
-        # apply sigmoid to map values to range [0, 1]
-        a = torch.sigmoid(x)
-
-        # For true samples we want all dot products to be positive, for simplicity
-        # we want them to be much higher mapping them to 1. The band-wise distance 
-        # can therefore be calculated as the difference between perfect score 
-        # [1, 1, ..., 1] and the activated dot product
-        if pos:
-            return 1 - torch.mean(a, dim=-1)
-        else:
-            return 1 - torch.min(a, dim=-1).values
-
-
-# ---------- Classes for calculating hyperplane diversity ----------
-
-# TODO: build function to measure diversity...
-
-
-# ---------- Main loss class ----------
-
-
-class AnswerSpaceLoss(nn.Module):
-    """A loss for answer space."""
-    def __init__(self, aggr: str = 'softmin'):
+class QASEAnserSpaceLoss(AnswerSpaceLoss):
+    def __init__(self, pos_w: float = 1.0, neg_w: float = 1.0, div_w: float = 1.0) -> None:
         super().__init__()
-        assert aggr in ['min', 'mean', 'softmin']
-        self.aggr = aggr
+        self.pos_w = pos_w
+        self.neg_w = neg_w
+        self.div_w = div_w
 
-        # Define softmin if required
-        self.distance = SigmoidDistance()
-        if aggr == 'softmin':
-            self.sm = nn.Softmin(dim=-1)
-
-
-    def _calc_dot(self, hyp: Tensor, y: Tensor):
-        """Calculated dot product between hyperplanes and entity."""
-        
-        # add extra dimensions to y for broadcasting:  
-        # from  (batch_size, embed_dim)
-        # to    (batch_size, 1, 1, embed_dim)
-        y = y.reshape(y.size(0), 1, 1, y.size(1))
-        
-        # calculate dot product with hyperplanes
-        # to    (batch_size, num_bands, num_hyperplanes)
-        dot = torch.mul(hyp, y).sum(dim=-1)
-        
-        return dot
-
+    def _shuffled_indices(self, max_index: int) -> Sequence[int]:
+        out = []
+        for idx in range(max_index):
+            out.append(random.choice([x for x in range(max_index) if not x == idx]))
+        return out
 
     def forward(
         self,
@@ -90,31 +51,32 @@ class AnswerSpaceLoss(nn.Module):
         neg_embeds: Tensor
         ) -> Tensor:
 
-        # calculate distance per band for true and false samples:
-        # (batch_size, num_bands)
-        d_true = self.distance(self._calc_dot(hyp, pos_embeds))
-        d_false = self.distance(self._calc_dot(hyp, neg_embeds), pos=False)
+        # hyp shape: (batch_size, num_bands, num_hyp, embed_dim)
         
-        # aggregate the band-wise losses for positive samples. We only need one band to 
-        # contain the answer, so we use a trade-off between exploration and exploitation.
-        if self.aggr == 'min':
-            p = torch.min(d_true, dim=-1).values
-        elif self.aggr == 'mean':
-            p = torch.mean(d_true, dim=-1)
-        elif self.aggr == 'softmin':
-            p = torch.sum(d_true * self.sm(d_true), dim=-1)
-        
-        # aggregate the band-wise losses for negative samples. we want all bands to always 
-        # move away from non-target entities, we even prefer them to contain no answers at 
-        # all in many cases. So we aggregate them uniformly.
-        n = torch.mean(d_false, dim=-1)
+        pos_ = pos_embeds.reshape(pos_embeds.size(0), 1, 1, pos_embeds.size(1))     # shape: (batch, 1, 1, embed_dim)
+        pos_cos_sim = torch.cosine_similarity(pos_, hyp, dim=-1)                    # shape: (batch, num_bands, num_hyp)
 
-        # we want to minimize the distance for positive samples and maximize it for 
-        # negative samples:
-        loss =  p - n
+        neg_ = neg_embeds.reshape(neg_embeds.size(0), 1, 1, neg_embeds.size(1))     # shape: (batch, 1, 1, embed_dim)
+        neg_cos_sim = torch.cosine_similarity(neg_, hyp, dim=-1)                    # shape: (batch, num_bands, num_hyp)
 
-        # return mean for batch
-        return torch.mean(loss), torch.mean(p.detach()).item(), torch.mean(n.detach()).item()
+        neg_hyp = hyp[:, :, self._shuffled_indices(hyp.size(2)), :]                 # shape: (batch_size, num_bands, num_hyp, embed_dim)
+        div_cos_sim = torch.cosine_similarity(hyp, neg_hyp, dim=-1)                 # shape: (batch, num_bands, num_hyp)
 
-    def __repr__(self):
-	    return '{}(Dist={}, aggr={})'.format(self.__class__.__name__, self.distance, self.aggr)
+        # calculate band distance:
+        band_pos_loss = -torch.mean(pos_cos_sim, dim=-1)    # shape (batch, num_bands)
+        band_neg_loss =  torch.mean(neg_cos_sim, dim=-1)    # shape (batch, num_bands)
+        band_div_loss =  torch.mean(div_cos_sim, dim=-1)    # shape (batch, num_bands)
+
+        # aggregate band distances:
+        batch_pos_loss = torch.mean(band_pos_loss, dim=-1)  # shape (batch)
+        batch_neg_loss = torch.mean(band_neg_loss, dim=-1)  # shape (batch)
+        batch_div_loss = torch.mean(band_div_loss, dim=-1)  # shape (batch)
+
+        # calculate margin loss
+        batch_loss = batch_pos_loss * self.pos_w + batch_neg_loss * self.neg_w + batch_div_loss * self.div_w
+
+        loss = torch.mean(batch_loss)
+        p = torch.mean(batch_pos_loss.detach(), dim=-1).item()
+        n = torch.mean(batch_neg_loss.detach(), dim=-1).item()
+        d = torch.mean(batch_div_loss.detach(), dim=-1).item()
+        return loss, p, n, d

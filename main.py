@@ -5,7 +5,7 @@ import logging
 from argparse import ArgumentParser
 
 from helper import create_logger
-from loss import AnswerSpaceLoss
+from loss import AnswerSpaceLoss, QASEAnserSpaceLoss
 from models import AnswerSpaceModel
 from loader import *
 from train import train
@@ -20,7 +20,7 @@ parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Wh
 parser.add_argument("--model",          type=str,   default="bandwise", help="Which model to use: ['hypewise', 'bandwise']")
 parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension of the entities and relations")
 parser.add_argument("--num_bands",      type=int,   default=8,          help="The number of bands")
-parser.add_argument("--band_size",      type=int,   default=16,          help="The size of the bands (number of hyperplanes per band)")
+parser.add_argument("--band_size",      type=int,   default=16,         help="The size of the bands (number of hyperplanes per band)")
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
@@ -33,7 +33,7 @@ parser.add_argument("--gcn_dropout",    type=float, default=0.5,        help="If
 parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="If the weights of the convolution layer are shared within a GCN")
 
 # Loss parameters
-parser.add_argument("--loss_aggr",      type=str,   default="min",      help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
+# parser.add_argument("--loss_aggr",      type=str,   default="min",      help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
 
 # Optimizer parameters
 parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
@@ -74,7 +74,7 @@ model = AnswerSpaceModel(
 # logging.info(f"Model: {model}")
 
 # Define loss function
-loss_fn = AnswerSpaceLoss(args.loss_aggr)
+loss_fn = QASEAnserSpaceLoss()
 logging.info(f"Loss: {loss_fn}")
 
 # Define optimizer
