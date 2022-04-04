@@ -68,15 +68,15 @@ class QASEAnserSpaceLoss(AnswerSpaceLoss):
         band_div_loss =  torch.mean(div_cos_sim, dim=-1)    # shape (batch, num_bands)
 
         # aggregate band distances:
-        pos_w = torch.softmax(-band_pos_loss, dim=-1)
-        batch_pos_loss = torch.sum(band_pos_loss * pos_w, dim=-1)   # shape (batch)
+        focus = torch.softmax(-band_pos_loss, dim=-1)
+        batch_pos_loss = torch.sum(band_pos_loss * focus, dim=-1)   # shape (batch)
         batch_neg_loss = torch.mean(band_neg_loss, dim=-1)          # shape (batch)
-        batch_div_loss = torch.sum(band_div_loss* pos_w, dim=-1)    # shape (batch)
+        batch_div_loss = torch.sum(band_div_loss* focus, dim=-1)    # shape (batch)
 
         # calculate margin loss
         batch_loss = batch_pos_loss * self.pos_w + batch_neg_loss * self.neg_w + batch_div_loss * self.div_w
 
-        loss = torch.mean(batch_loss)
+        loss = torch.mean(batch_loss, dim=-1) # shape (1)
         p = torch.mean(batch_pos_loss.detach(), dim=-1).item()
         n = torch.mean(batch_neg_loss.detach(), dim=-1).item()
         d = torch.mean(batch_div_loss.detach(), dim=-1).item()
