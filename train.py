@@ -4,10 +4,10 @@ import wandb
 import optuna
 import logging
 
-try:
-    import google.colab
+import os
+if 'COLAB_GPU' in os.environ:
     from tqdm.notebook import tqdm
-except:
+else:
     from tqdm import tqdm
 
 import numpy as np
