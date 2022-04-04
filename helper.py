@@ -1,4 +1,13 @@
-import tqdm
+try:
+    import google.colab
+    IN_COLAB = True
+except:
+    IN_COLAB = False
+if IN_COLAB:
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
+
 import logging
 from datetime import datetime
 
