@@ -36,6 +36,7 @@ def _train_epoch(
     batch_losses = []
     pos_distances = []
     neg_distances = []
+    div_distances = []
     
     x_info: QueryBatchInfo
     y_info: QueryTargetInfo
@@ -44,7 +45,7 @@ def _train_epoch(
         optimizer.zero_grad()
         hyp = model(x_info)
         pos_emb, neg_emb = model.embed_targets(y_info)
-        loss, p_dist, n_dist = loss_fn(hyp, pos_emb, neg_emb)
+        loss, p_loss, n_loss, d_loss = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
         
@@ -55,22 +56,24 @@ def _train_epoch(
         wandb.log({
             "train": {
                 "batch": {
-                    "batch_loss": loss_val, "batch_p_dist": p_dist, "batch_n_dist": n_dist, "batch_id": curr_batch}}})
+                    "batch_loss": loss_val, "batch_p_dist": p_loss, "batch_n_dist": n_loss, "batch_d_dist": d_loss, "batch_id": curr_batch}}})
 
         batch_losses.append(loss_val)
-        pos_distances.append(p_dist)
-        neg_distances.append(n_dist)
+        pos_distances.append(p_loss)
+        neg_distances.append(n_loss)
+        div_distances.append(d_loss)
 
     mean_loss   = np.mean(batch_losses)
     mean_dist_p = np.mean(pos_distances)
     mean_dist_n = np.mean(neg_distances)
+    mean_dist_d = np.mean(div_distances)
     
     # Log epoch metrics to WandB
-    logger.info(f"Mean epoch loss: {mean_loss:.5f} ({mean_dist_p:.5f} - {mean_dist_n:.5f})")
+    logger.info(f"Mean epoch loss: {mean_loss:.5f} ({mean_dist_p:.5f} + {mean_dist_n:.5f} + {mean_dist_d:.5f})")
     wandb.log({
         "train": {
             "epoch": {
-                "mean_loss": mean_loss, "mean_dist_p": mean_dist_p, "mean_dist_n": mean_dist_n, "epoch_id": epoch}}})
+                "mean_loss": mean_loss, "mean_dist_p": mean_dist_p, "mean_dist_n": mean_dist_n, "mean_dist_d": mean_dist_d, "epoch_id": epoch}}})
     
     return mean_loss
 
