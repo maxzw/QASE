@@ -1,5 +1,6 @@
 """Main script"""
 
+import sys
 import wandb
 import logging
 from argparse import ArgumentParser
@@ -48,6 +49,8 @@ parser.add_argument("--min_epochs",     type=int,   default=5,          help="Th
 parser.add_argument("--early_stop",     type=int,   default=10000,       help="Number of rounds after training is stopped when loss does not go down")
 # parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
 args = parser.parse_args()
+
+print(sys.modules)
 
 # Create logger
 create_logger(args.dataset)
