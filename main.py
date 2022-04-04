@@ -30,7 +30,7 @@ parser.add_argument("--gcn_comp",       type=str,   default="mult",     help="Co
 parser.add_argument("--gcn_use_bias",   type=bool,  default=True,       help="If convolution layer contains bias")
 parser.add_argument("--gcn_use_bn",     type=bool,  default=True,       help="If convolution layer contains batch normalization")
 parser.add_argument("--gcn_dropout",    type=float, default=0.5,        help="If convolution layer contains dropout")
-parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="If the weights of the convolution layer are shared within a GCN")
+parser.add_argument("--gcn_share_w",    type=bool,  default=True,       help="If the weights of the convolution layer are shared within a GCN")
 
 # Loss parameters
 # parser.add_argument("--loss_aggr",      type=str,   default="min",      help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
