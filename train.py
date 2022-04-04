@@ -83,6 +83,7 @@ def train(
     train_dataloader: DataLoader,
     loss_fn: AnswerSpaceLoss,
     optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
     num_epochs: int,
     val_dataloader: DataLoader,
     val_freq: int,
@@ -111,6 +112,9 @@ def train(
             epoch
             )
         epoch_losses.append(epoch_loss)
+
+        # Update learning rate scheduler
+        scheduler.step(epoch_loss)
 
         # Evaluate
         if (epoch + 1) % val_freq == 0:

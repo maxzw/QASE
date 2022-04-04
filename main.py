@@ -83,6 +83,7 @@ if args.optim == "adam":
 elif args.optim == "sgd":
     optimizer = torch.optim.sgd(model.parameters(), args.lr)
 logging.info(f"Optimizer: {optimizer}")
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5)
 
 # Load queries
 exclude = ['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter']
@@ -113,6 +114,7 @@ epoch_losses, val_report = train(
     train_dataloader=train_dataloader,
     loss_fn=loss_fn,
     optimizer=optimizer,
+    scheduler=scheduler,
     num_epochs=args.num_epochs,
     val_dataloader=val_dataloader,
     val_freq=args.val_freq,
