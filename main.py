@@ -86,7 +86,7 @@ logging.info(f"Optimizer: {optimizer}")
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
     patience=2,
-    factor=0.5
+    factor=0.5,
     verbose=True)
 
 # Load queries
