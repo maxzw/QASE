@@ -17,20 +17,20 @@ parser = ArgumentParser()
 # Dataset & model parameters
 parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Which dataset to use: ['AIFB', 'AM', 'BIO', 'MUTAG']")
 # parser.add_argument("--load_best",      type=bool,  default=False,      help="If best model for this dataset should be loaded")
-parser.add_argument("--model",          type=str,   default="hypewise", help="Which model to use: ['hypewise', 'bandwise']")
+parser.add_argument("--model",          type=str,   default="bandwise", help="Which model to use: ['hypewise', 'bandwise']")
 parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension of the entities and relations")
 parser.add_argument("--num_bands",      type=int,   default=8,          help="The number of bands")
 parser.add_argument("--band_size",      type=int,   default=16,         help="The size of the bands (number of hyperplanes per band)")
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
-parser.add_argument("--gcn_stop_dia",   type=bool,  default=True,      help="If message passing stopping stops when number of passes equals query diameter")
+parser.add_argument("--gcn_stop_dia",   type=bool,  default=False,      help="If message passing stopping stops when number of passes equals query diameter")
 parser.add_argument("--gcn_pool",       type=str,   default="tm",       help="Graph pooling operator: ['max', 'sum', 'tm']")
 parser.add_argument("--gcn_comp",       type=str,   default="mult",     help="Composition operator: ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot']")
 parser.add_argument("--gcn_use_bias",   type=bool,  default=True,       help="If convolution layer contains bias")
 parser.add_argument("--gcn_use_bn",     type=bool,  default=True,       help="If convolution layer contains batch normalization")
 parser.add_argument("--gcn_dropout",    type=float, default=0.5,        help="If convolution layer contains dropout")
-parser.add_argument("--gcn_share_w",    type=bool,  default=True,       help="If the weights of the convolution layer are shared within a GCN")
+parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="If the weights of the convolution layer are shared within a GCN")
 
 # Loss parameters
 # parser.add_argument("--loss_aggr",      type=str,   default="min",      help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
@@ -84,7 +84,6 @@ elif args.optim == "sgd":
     optimizer = torch.optim.sgd(model.parameters(), args.lr)
 logging.info(f"Optimizer: {optimizer}")
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
-logging.info(f"Scheduler: {scheduler}")
 
 # Load queries
 exclude = ['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter']
