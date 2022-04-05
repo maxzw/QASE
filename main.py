@@ -128,18 +128,18 @@ wandb.init(
     )
 
 # Run training
-# epoch_losses, val_report = train(
-#     model=model,
-#     train_dataloader=train_dataloader,
-#     loss_fn=loss_fn,
-#     optimizer=optimizer,
-#     scheduler=scheduler,
-#     num_epochs=args.num_epochs,
-#     val_dataloader=val_dataloader,
-#     val_freq=args.val_freq,
-#     early_stopper=early_stopper)
-# logging.info(epoch_losses)
-# logging.info(val_report)
+epoch_losses, val_report = train(
+    model=model,
+    train_dataloader=train_dataloader,
+    loss_fn=loss_fn,
+    optimizer=optimizer,
+    scheduler=scheduler,
+    num_epochs=args.num_epochs,
+    val_dataloader=val_dataloader,
+    val_freq=args.val_freq,
+    early_stopper=early_stopper)
+logging.info(epoch_losses)
+logging.info(val_report)
 
 # Evaluate on test data
 test_results = evaluate(model, test_dataloader)
