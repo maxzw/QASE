@@ -1,6 +1,6 @@
 """Loss functions for hyperplane configurations"""
 import random
-from typing import Sequence
+from typing import Sequence, Tuple
 from abc import abstractmethod
 
 import torch
@@ -49,7 +49,7 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         hyp: Tensor,
         pos_embeds: Tensor,
         neg_embeds: Tensor
-        ) -> Tensor:
+        ) -> Tuple[Tensor, float, float, float]:
 
         # hyp shape: (batch_size, num_bands, num_hyp, embed_dim)
         
@@ -81,3 +81,6 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         n = torch.mean(batch_neg_loss.detach(), dim=-1).item()
         d = torch.mean(batch_div_loss.detach(), dim=-1).item()
         return loss, p, n, d
+
+    def __repr__(self):
+        return f"QASEAnswerSpaceLoss(pos_w={self.pos_w}, neg_w={self.neg_w}, div_w={self.div_w})"

@@ -10,6 +10,7 @@ from typing import Optional, Sequence, Tuple
 
 import torch
 from torch.utils.data import DataLoader
+from helper import EarlyStopping
 
 from models import AnswerSpaceModel
 from loader import QueryBatchInfo, QueryTargetInfo
@@ -49,7 +50,6 @@ def _train_epoch(
         optimizer.step()
         
         loss_val = loss.detach().item()
-        
         # Log batch metrics to WandB
         curr_batch = epoch * len(dataloader) + batch_nr
         wandb.log({
@@ -61,7 +61,8 @@ def _train_epoch(
         pos_distances.append(p_loss)
         neg_distances.append(n_loss)
         div_distances.append(d_loss)
-
+    
+    # Log epoch metrics to WandB
     mean_loss   = np.mean(batch_losses)
     mean_dist_p = np.mean(pos_distances)
     mean_dist_n = np.mean(neg_distances)
@@ -86,15 +87,12 @@ def train(
     num_epochs: int,
     val_dataloader: DataLoader,
     val_freq: int,
-    early_stop: Optional[int] = None,
+    early_stopper: EarlyStopping = None,
     trial: Optional[optuna.Trial] = None
     ) -> Tuple[Sequence[float], DataFrame]:
 
     # Keep track of total loss during training
     epoch_losses = []
-    if early_stop is not None:
-        lowest_loss = np.inf
-        early_stop_counter = 0
 
     # Keep track of classification statistics during training
     val_report = ClassificationReport()
@@ -108,8 +106,7 @@ def train(
             train_dataloader,
             loss_fn,
             optimizer,
-            epoch
-            )
+            epoch)
         epoch_losses.append(epoch_loss)
 
         # Update learning rate scheduler
@@ -120,8 +117,7 @@ def train(
             val_results = evaluate(
                 model,
                 val_dataloader,
-                epoch # Means we're tracking answer set size
-                )
+                epoch) # Means we're tracking answer set size
 
             # Log val results and include in training report
             val_report.include(val_results, epoch)
@@ -134,16 +130,10 @@ def train(
                 if trial.should_prune():
                     raise optuna.TrialPruned()
         
-        # Apply early stopping if needed (and not in trial)
-        if (early_stop is not None) and (trial is None):
-            if epoch_loss < lowest_loss:
-                lowest_loss = epoch_loss
-                early_stop_counter = 0
-            else:
-                early_stop_counter += 1
-                logging.info(f"Loss has not decreased! Current best: {lowest_loss:.3f}, current: {epoch_loss:.3f}. At ({early_stop_counter}/{early_stop}) of early stopping.")
-            if early_stop_counter >= early_stop:
-                logging.info(f"Loss has not decreased for {early_stop} rounds, aborting training...")
+        # Apply early stopping if needed
+        if (early_stopper is not None) and (trial is None):
+            early_stopper(epoch_loss)
+            if early_stopper.stop:
                 break
 
     return epoch_losses, val_report.src

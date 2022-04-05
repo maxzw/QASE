@@ -4,7 +4,7 @@ import wandb
 import logging
 from argparse import ArgumentParser
 
-from helper import create_logger
+from helper import EarlyStopping, create_logger
 from loss import QASEAnswerSpaceLoss
 from models import AnswerSpaceModel
 from loader import *
@@ -16,7 +16,6 @@ parser = ArgumentParser()
 
 # Dataset & model parameters
 parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Which dataset to use: ['AIFB', 'AM', 'BIO', 'MUTAG']")
-# parser.add_argument("--load_best",      type=bool,  default=False,      help="If best model for this dataset should be loaded")
 parser.add_argument("--model",          type=str,   default="bandwise", help="Which model to use: ['hypewise', 'bandwise']")
 parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension of the entities and relations")
 parser.add_argument("--num_bands",      type=int,   default=8,          help="The number of bands")
@@ -32,21 +31,16 @@ parser.add_argument("--gcn_use_bn",     type=bool,  default=True,       help="If
 parser.add_argument("--gcn_dropout",    type=float, default=0.5,        help="If convolution layer contains dropout")
 parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="If the weights of the convolution layer are shared within a GCN")
 
-# Loss parameters
-# parser.add_argument("--loss_aggr",      type=str,   default="min",      help="The aggregation technique for band distances of positive samples: ['min', 'mean', 'softmin']")
-
 # Optimizer parameters
 parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
 parser.add_argument("--lr",             type=float, default=1e-3,       help="Learning rate")
 
 # Training parameters
-# parser.add_argument("--do_train",       type=bool,  default=True,       help="If we go through training loop (disable for testing loaded model)")
-# parser.add_argument("--save_best",      type=bool,  default=True,       help="If model should be saved if it performs better than current best model")
 parser.add_argument("--num_epochs",     type=int,   default=50,         help="Number of training epochs")
 parser.add_argument("--val_freq",       type=int,   default=1,          help="Validation frequency (epochs)")
-parser.add_argument("--min_epochs",     type=int,   default=5,          help="The minimal number of epochs to train (only relevant in combination with early stopping)")
-parser.add_argument("--early_stop",     type=int,   default=10000,       help="Number of rounds after training is stopped when loss does not go down")
-# parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
+parser.add_argument("--early_stop",     type=bool,  default=True,       help="If we use early stopping")
+parser.add_argument("--stop_pt",        type=int,   default=2,          help="Early stopping patience (epochs)")
+parser.add_argument("--stop_delta",     type=float, default=0.0,        help="Early stopping delta")
 args = parser.parse_args()
 
 # Create logger
@@ -71,23 +65,7 @@ model = AnswerSpaceModel(
     gcn_dropout = args.gcn_dropout,
     gcn_share_weights = args.gcn_share_w
 )
-# logging.info(f"Model: {model}")
-
-# Define loss function
-loss_fn = QASEAnswerSpaceLoss()
-logging.info(f"Loss: {loss_fn}")
-
-# Define optimizer
-if args.optim == "adam":
-    optimizer = torch.optim.Adam(model.parameters(), args.lr)
-elif args.optim == "sgd":
-    optimizer = torch.optim.sgd(model.parameters(), args.lr)
-logging.info(f"Optimizer: {optimizer}")
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer,
-    patience=2,
-    factor=0.5,
-    verbose=True)
+logging.info(f"Model: {model}")
 
 # Load queries
 exclude = ['2-chain', '3-chain', '2-inter', '3-inter', '3-inter_chain', '3-chain_inter']
@@ -102,6 +80,31 @@ logging.info(f"Test info: {test_info}")
 train_dataloader = get_dataloader(train_queries, batch_size = 128, shuffle=True, num_workers=2)
 val_dataloader = get_dataloader(val_queries, batch_size = 128, shuffle=False, num_workers=2)
 test_dataloader = get_dataloader(test_queries, batch_size = 128, shuffle=False, num_workers=2)
+
+# Define loss function
+loss_fn = QASEAnswerSpaceLoss()
+logging.info(f"Loss: {loss_fn}")
+
+# Define optimizer
+if args.optim == "adam":
+    optimizer = torch.optim.Adam(model.parameters(), args.lr)
+elif args.optim == "sgd":
+    optimizer = torch.optim.sgd(model.parameters(), args.lr)
+logging.info(f"Optimizer: {optimizer}")
+
+# Define learning rate scheduler
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer,
+    patience=2,
+    factor=0.5,
+    verbose=True)
+
+# Initialize early stopper
+early_stopper = EarlyStopping(
+    patience=args.stop_pt,
+    min_delta=args.stop_delta,
+) if args.early_stop else None
+logging.info(f"Early stopper: {early_stopper}")
 
 # Initialize WandB logging
 wandb.login()
@@ -122,7 +125,7 @@ epoch_losses, val_report = train(
     num_epochs=args.num_epochs,
     val_dataloader=val_dataloader,
     val_freq=args.val_freq,
-    early_stop=args.early_stop)
+    early_stopper=early_stopper)
 logging.info(epoch_losses)
 logging.info(val_report)
 
