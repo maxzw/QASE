@@ -1,5 +1,6 @@
 """Main script"""
 
+from this import d
 import wandb
 import logging
 from argparse import ArgumentParser
@@ -16,14 +17,14 @@ parser = ArgumentParser()
 
 # Dataset & model parameters
 parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Which dataset to use: ['AIFB', 'AM', 'BIO', 'MUTAG']")
-parser.add_argument("--model",          type=str,   default="bandwise", help="Which model to use: ['hypewise', 'bandwise']")
+parser.add_argument("--model",          type=str,   default="hypewise", help="Which model to use: ['hypewise', 'bandwise']")
 parser.add_argument("--embed_dim",      type=int,   default=128,        help="The embedding dimension of the entities and relations")
 parser.add_argument("--num_bands",      type=int,   default=8,          help="The number of bands")
 parser.add_argument("--band_size",      type=int,   default=16,         help="The size of the bands (number of hyperplanes per band)")
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
-parser.add_argument("--gcn_stop_dia",   type=bool,  default=False,      help="If message passing stopping stops when number of passes equals query diameter")
+parser.add_argument("--gcn_stop_dia",   type=bool,  default=True,      help="If message passing stopping stops when number of passes equals query diameter")
 parser.add_argument("--gcn_pool",       type=str,   default="tm",       help="Graph pooling operator: ['max', 'sum', 'tm']")
 parser.add_argument("--gcn_comp",       type=str,   default="mult",     help="Composition operator: ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot']")
 parser.add_argument("--gcn_use_bias",   type=bool,  default=True,       help="If convolution layer contains bias")
@@ -31,12 +32,16 @@ parser.add_argument("--gcn_use_bn",     type=bool,  default=True,       help="If
 parser.add_argument("--gcn_dropout",    type=float, default=0.5,        help="If convolution layer contains dropout")
 parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="If the weights of the convolution layer are shared within a GCN")
 
+# Loss parameters
+parser.add_argument("--pos_w",          type=float, default=1.0,        help="The weight of the positive loss")
+parser.add_argument("--neg_w",          type=float, default=1.0,        help="The weight of the negative loss")
+parser.add_argument("--div_w",          type=float, default=0.5,        help="The weight of the diversity loss")
+
 # Optimizer parameters
 parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
 parser.add_argument("--lr",             type=float, default=1e-3,       help="Learning rate")
 parser.add_argument("--sched_pt",       type=int,   default=2,          help="Lr scheduler patience")
 parser.add_argument("--sched_f",        type=float, default=0.5,        help="lr scheduler reducing factor")
-
 
 # Training parameters
 parser.add_argument("--num_epochs",     type=int,   default=50,         help="Number of training epochs")
@@ -85,7 +90,11 @@ val_dataloader = get_dataloader(val_queries, batch_size = 128, shuffle=False, nu
 test_dataloader = get_dataloader(test_queries, batch_size = 128, shuffle=False, num_workers=2)
 
 # Define loss function
-loss_fn = QASEAnswerSpaceLoss()
+loss_fn = QASEAnswerSpaceLoss(
+    pos_w=args.pos_w,
+    neg_w=args.neg_w,
+    div_w=args.div_w
+)
 logging.info(f"Loss: {loss_fn}")
 
 # Define optimizer
