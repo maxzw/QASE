@@ -58,8 +58,8 @@ else:
     print("loading tqdm from default")
     from tqdm import tqdm
 
-for batch_nr, x in enumerate(tqdm(range(100), desc="Epoch", unit="batch", position=1, leave=False)):
-    print(f"{batch_nr} and {x}")
+for x in tqdm(range(100), desc="Epoch", unit="batch", position=1, leave=False)):
+    print(f" this is {x}")
     sleep(1)
 
 # # Create logger
