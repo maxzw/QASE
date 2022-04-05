@@ -1,16 +1,5 @@
-from argparse import ArgumentParser
-parser = ArgumentParser()
-parser.add_argument("--nb", type=bool, default=False)
-args = parser.parse_known_args()
-if args[0].nb:
-    print("loading tqdm from notebook")
-    from tqdm.notebook import tqdm
-else:
-    print("loading tqdm from default")
-
-    from tqdm import tqdm
-
 import logging
+from tqdm import tqdm
 from datetime import datetime
 
 import torch
