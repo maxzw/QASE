@@ -1,6 +1,5 @@
 """Loss functions for hyperplane configurations"""
-import random
-from typing import Sequence, Tuple
+from typing import Tuple
 from abc import abstractmethod
 
 import torch
@@ -38,12 +37,6 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         self.neg_w = neg_w
         self.div_w = div_w
 
-    def _shuffled_indices(self, max_index: int) -> Sequence[int]:
-        out = []
-        for idx in range(max_index):
-            out.append(random.choice([x for x in range(max_index) if not x == idx]))
-        return out
-
     def forward(
         self,
         hyp: Tensor,
@@ -59,8 +52,9 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         neg_ = neg_embeds.reshape(neg_embeds.size(0), 1, 1, neg_embeds.size(1))     # shape: (batch, 1, 1, embed_dim)
         neg_cos_sim = torch.cosine_similarity(neg_, hyp, dim=-1)                    # shape: (batch, num_bands, num_hyp)
 
-        neg_hyp = hyp[:, :, self._shuffled_indices(hyp.size(2)), :]                 # shape: (batch_size, num_bands, num_hyp, embed_dim)
-        div_cos_sim = torch.cosine_similarity(hyp, neg_hyp, dim=-1)                 # shape: (batch, num_bands, num_hyp)
+        hyp_1 = hyp.reshape(hyp.size(0), hyp.size(1), 1, hyp.size(2), hyp.size(3))  # shape: (batch_size, num_bands, 1, num_hyp, embed_dim)
+        hyp_2 = hyp.reshape(hyp.size(0), hyp.size(1), hyp.size(2), 1, hyp.size(3))  # shape: (batch_size, num_bands, num_hyp, 1, embed_dim)
+        div_cos_sim = torch.mean(torch.cosine_similarity(hyp_1, hyp_2, dim=-1), dim=-1) # shape: (batch, num_bands, num_hyp)
 
         # calculate band distance:
         band_pos_loss = -torch.mean(pos_cos_sim, dim=-1)    # shape (batch, num_bands)

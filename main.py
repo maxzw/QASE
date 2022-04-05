@@ -24,13 +24,13 @@ parser.add_argument("--band_size",      type=int,   default=16,         help="Th
 
 # GCN parameters
 parser.add_argument("--gcn_layers",     type=int,   default=3,          help="The number of layers per gcn model: [1, 2, 3]")
-parser.add_argument("--gcn_stop_dia",   type=bool,  default=True,      help="If message passing stopping stops when number of passes equals query diameter")
+parser.add_argument("--gcn_stop_dia",   type=bool,  default=True,       help="If message passing stopping stops when number of passes equals query diameter")
 parser.add_argument("--gcn_pool",       type=str,   default="tm",       help="Graph pooling operator: ['max', 'sum', 'tm']")
 parser.add_argument("--gcn_comp",       type=str,   default="mult",     help="Composition operator: ['sub', 'mult', 'cmult', 'cconv', 'ccorr', 'crot']")
 parser.add_argument("--gcn_use_bias",   type=bool,  default=True,       help="If convolution layer contains bias")
 parser.add_argument("--gcn_use_bn",     type=bool,  default=True,       help="If convolution layer contains batch normalization")
 parser.add_argument("--gcn_dropout",    type=float, default=0.5,        help="If convolution layer contains dropout")
-parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="If the weights of the convolution layer are shared within a GCN")
+parser.add_argument("--gcn_share_w",    type=bool,  default=False,      help="If the weights of the convolution layer are shared within a GCN")
 
 # Loss parameters
 parser.add_argument("--pos_w",          type=float, default=1.0,        help="The weight of the positive loss")
@@ -40,6 +40,7 @@ parser.add_argument("--div_w",          type=float, default=0.5,        help="Th
 # Optimizer parameters
 parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
 parser.add_argument("--lr",             type=float, default=1e-3,       help="Learning rate")
+parser.add_argument("--use_sched",      type=bool,  default=True,       help="If learning rate should be reduced over time")
 parser.add_argument("--sched_pt",       type=int,   default=2,          help="Lr scheduler patience")
 parser.add_argument("--sched_f",        type=float, default=0.5,        help="lr scheduler reducing factor")
 
@@ -109,7 +110,8 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
     patience=args.sched_pt,
     factor=args.sched_f,
-    verbose=True)
+    verbose=True) if args.use_sched else None
+logging.info(f"Scheduler: {scheduler}")
 
 # Initialize early stopper
 early_stopper = EarlyStopping(
