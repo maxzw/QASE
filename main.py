@@ -1,6 +1,6 @@
 """Main script"""
 
-from time import time
+from time import sleep
 import wandb
 import logging
 from argparse import ArgumentParser
@@ -60,7 +60,7 @@ else:
 
 for batch_nr, x in enumerate(tqdm(range(100), desc="Epoch", unit="batch", position=1, leave=False)):
     print(f"{batch_nr} and {x}")
-    time.sleep(1)
+    sleep(1)
 
 # # Create logger
 # create_logger(args.dataset)
