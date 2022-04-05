@@ -246,7 +246,7 @@ class AnswerSpaceModel(nn.Module):
         hyp: Tensor
         ) -> Sequence[Sequence[int]]:
 
-        answers = torch.empty((hyp.size(0)), dtype=torch.int64)
+        answers = [[] for _ in range(hyp.size(0))]
 
         with torch.no_grad():
             
@@ -273,7 +273,7 @@ class AnswerSpaceModel(nn.Module):
                 # shape: (num_entities)
                 ent_inds = torch.any(band_inds, dim=-1)
 
-                answers[batch_idx] = ent_inds.nonzero(as_tuple=True)[0]
+                answers[batch_idx] = ent_inds.nonzero(as_tuple=True)[0].tolist()
                 
         return answers
 
