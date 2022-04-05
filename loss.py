@@ -31,7 +31,7 @@ class AnswerSpaceLoss(nn.Module):
         raise NotImplementedError
 
 
-class QASEAnserSpaceLoss(AnswerSpaceLoss):
+class QASEAnswerSpaceLoss(AnswerSpaceLoss):
     def __init__(self, pos_w: float = 1.0, neg_w: float = 1.0, div_w: float = 1.0) -> None:
         super().__init__()
         self.pos_w = pos_w
