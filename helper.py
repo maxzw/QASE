@@ -1,12 +1,12 @@
 from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument("--nb", type=bool, default=False)
-args = parser.parse_args()
+args = parser.parse_known_args()
 if args.nb:
     from tqdm.notebook import tqdm
 else:
     from tqdm import tqdm
-    
+
 import logging
 from datetime import datetime
 from main import tqdm
