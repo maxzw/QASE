@@ -5,7 +5,7 @@ import logging
 from argparse import ArgumentParser
 
 from helper import create_logger
-from loss import AnswerSpaceLoss, QASEAnserSpaceLoss
+from loss import QASEAnswerSpaceLoss
 from models import AnswerSpaceModel
 from loader import *
 from train import train
@@ -74,7 +74,7 @@ model = AnswerSpaceModel(
 # logging.info(f"Model: {model}")
 
 # Define loss function
-loss_fn = QASEAnserSpaceLoss()
+loss_fn = QASEAnswerSpaceLoss()
 logging.info(f"Loss: {loss_fn}")
 
 # Define optimizer
