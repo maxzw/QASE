@@ -9,7 +9,6 @@ else:
 
 import logging
 from datetime import datetime
-from main import tqdm
 
 import torch
 from torch.nn.init import xavier_normal_

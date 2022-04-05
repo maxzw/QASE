@@ -12,7 +12,6 @@ else:
 import wandb
 import optuna
 import logging
-from main import tqdm
 
 import numpy as np
 from pandas import DataFrame
