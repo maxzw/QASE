@@ -52,6 +52,7 @@ args = parser.parse_args()
 
 # Create logger
 create_logger(args.dataset)
+logging.info(f"Training in notebook: {args.nb}")
 logging.info(f"Training on dataset: {args.dataset}")
 
 # Create model
