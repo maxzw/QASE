@@ -1,5 +1,14 @@
 """Training module"""
 
+from argparse import ArgumentParser
+parser = ArgumentParser()
+parser.add_argument("--nb", type=bool, default=False)
+args = parser.parse_args()
+if args.nb:
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
+
 import wandb
 import optuna
 import logging
