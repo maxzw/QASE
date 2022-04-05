@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument("--nb", type=bool, default=False)
 args = parser.parse_known_args()
+print(args)
 if args.nb:
     from tqdm.notebook import tqdm
 else:
