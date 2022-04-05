@@ -1,6 +1,11 @@
-from tqdm import tqdm
 import logging
 from datetime import datetime
+
+from main import IN_NB
+if IN_NB:
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 import torch
 from torch.nn.init import xavier_normal_

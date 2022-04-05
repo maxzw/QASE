@@ -1,12 +1,11 @@
 """Main script"""
 
-import sys
 import wandb
 import logging
 from argparse import ArgumentParser
 
 from helper import create_logger
-from loss import AnswerSpaceLoss, QASEAnserSpaceLoss
+from loss import QASEAnserSpaceLoss
 from models import AnswerSpaceModel
 from loader import *
 from train import train
@@ -14,6 +13,8 @@ from evaluation import evaluate
 
 
 parser = ArgumentParser()
+
+parser.add_argument("--nb",             type=bool,   default=False,     help="If script is run in a jupyter notebook (needed for tqdm import)")
 
 # Dataset & model parameters
 parser.add_argument("--dataset",        type=str,   default="AIFB",     help="Which dataset to use: ['AIFB', 'AM', 'BIO', 'MUTAG']")
@@ -49,6 +50,9 @@ parser.add_argument("--min_epochs",     type=int,   default=5,          help="Th
 parser.add_argument("--early_stop",     type=int,   default=10000,       help="Number of rounds after training is stopped when loss does not go down")
 # parser.add_argument("--do_test",        type=bool,  default=True,       help="If we evaluate on the test set")
 args = parser.parse_args()
+
+# Global constant indicating if we are in a jupyter notebook
+IN_NB = args.nb
 
 # Create logger
 create_logger(args.dataset)

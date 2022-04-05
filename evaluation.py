@@ -2,8 +2,12 @@
 
 import wandb
 import logging
-from tqdm import tqdm
-        
+
+from main import IN_NB
+if IN_NB:
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm        
 import numpy as np
 from pandas import DataFrame
 from collections import defaultdict
