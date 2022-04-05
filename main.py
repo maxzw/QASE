@@ -52,7 +52,10 @@ parser.add_argument("--early_stop",     type=int,   default=10000,       help="N
 args = parser.parse_args()
 
 # Global constant indicating if we are in a jupyter notebook
-IN_NB = args.nb
+if args.nb:
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 # Create logger
 create_logger(args.dataset)

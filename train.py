@@ -3,12 +3,7 @@
 import wandb
 import optuna
 import logging
-
-from main import IN_NB
-if IN_NB:
-    from tqdm.notebook import tqdm
-else:
-    from tqdm import tqdm
+from main import tqdm
 
 import numpy as np
 from pandas import DataFrame
