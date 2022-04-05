@@ -1,19 +1,8 @@
 """Training module"""
-
-from argparse import ArgumentParser
-parser = ArgumentParser()
-parser.add_argument("--nb", type=bool, default=False)
-args = parser.parse_known_args()
-if args[0].nb:
-    print("loading tqdm from notebook")
-    from tqdm.notebook import tqdm
-else:
-    print("loading tqdm from default")
-    from tqdm import tqdm
-
 import wandb
 import optuna
 import logging
+from tqdm import tqdm
 
 import numpy as np
 from pandas import DataFrame
