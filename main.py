@@ -34,12 +34,15 @@ parser.add_argument("--gcn_share_w",    type=bool,  default=False,       help="I
 # Optimizer parameters
 parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
 parser.add_argument("--lr",             type=float, default=1e-3,       help="Learning rate")
+parser.add_argument("--sched_pt",       type=int,   default=2,          help="Lr scheduler patience")
+parser.add_argument("--sched_f",        type=float, default=0.5,        help="lr scheduler reducing factor")
+
 
 # Training parameters
 parser.add_argument("--num_epochs",     type=int,   default=50,         help="Number of training epochs")
 parser.add_argument("--val_freq",       type=int,   default=1,          help="Validation frequency (epochs)")
 parser.add_argument("--early_stop",     type=bool,  default=True,       help="If we use early stopping")
-parser.add_argument("--stop_pt",        type=int,   default=2,          help="Early stopping patience (epochs)")
+parser.add_argument("--stop_pt",        type=int,   default=5,          help="Early stopping patience (epochs)")
 parser.add_argument("--stop_delta",     type=float, default=0.0,        help="Early stopping delta")
 args = parser.parse_args()
 
@@ -95,8 +98,8 @@ logging.info(f"Optimizer: {optimizer}")
 # Define learning rate scheduler
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
-    patience=2,
-    factor=0.5,
+    patience=args.sched_pt,
+    factor=args.sched_f,
     verbose=True)
 
 # Initialize early stopper
