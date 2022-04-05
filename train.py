@@ -133,7 +133,7 @@ def train(
         # Apply early stopping if needed
         if (early_stopper is not None) and (trial is None):
             early_stopper(epoch_loss)
-            if early_stopper.stop:
+            if early_stopper.early_stop:
                 break
 
     return epoch_losses, val_report.src
