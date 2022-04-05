@@ -13,7 +13,6 @@ from evaluation import evaluate
 
 
 parser = ArgumentParser()
-
 parser.add_argument("--nb",             type=bool,   default=False,     help="If script is run in a jupyter notebook (needed for tqdm import)")
 
 # Dataset & model parameters
