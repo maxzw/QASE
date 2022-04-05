@@ -241,7 +241,7 @@ def evaluate(
     for batch_id, (x_info, y_info) in enumerate(tqdm(dataloader, desc="Evaluate", unit="batch", position=1, leave=False)):
         
         hyp = model(x_info)
-        preds = model.predict(hyp, y_info.pos_modes)
+        preds = model.predict(hyp)
         results = classification_metrics(
             preds,
             y_info.target_nodes,

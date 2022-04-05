@@ -84,7 +84,6 @@ class AnswerSpaceModel(nn.Module):
                 device              = self.device
                 ) for _ in range(self.num_GCN_models)
         ])
-        logging.info(f"Based on method '{self.method}' build {self.num_GCN_models} GCN models ({self.layer_dims}, shared weights={self.gcn_share_weights})")
 
 
     def _build_embeddings(self):
@@ -107,10 +106,10 @@ class AnswerSpaceModel(nn.Module):
         self.num_nodes = sum(node_mode_counts.values())
 
         # create entity and variable embeddings
-        self.ent_features = nn.Embedding(self.num_nodes, self.embed_dim) #, max_norm=1)
+        self.ent_features = nn.Embedding(self.num_nodes, self.embed_dim, max_norm=1)
         # self.ent_features.weight.data.normal_(0, 1/self.embed_dim)
         logger.info(f"Created entity embeddings: {self.ent_features}")
-        self.var_features = nn.Embedding(len(node_maps), self.embed_dim) #, max_norm=1)
+        self.var_features = nn.Embedding(len(node_maps), self.embed_dim, max_norm=1)
         # self.var_features.weight.data.normal_(0, 1/self.embed_dim)
         logger.info(f"Created variable embeddings: {self.var_features}")
 
@@ -130,7 +129,7 @@ class AnswerSpaceModel(nn.Module):
         self.rel_maps = rel_maps
 
         # create relation embeddings
-        self.rel_features = nn.Embedding(num_rels, self.embed_dim) #, max_norm=1)
+        self.rel_features = nn.Embedding(num_rels, self.embed_dim, max_norm=1)
         # self.rel_features.weight.data.normal_(0, 1/self.embed_dim)
         logger.info(f"Created relation embeddings: {self.rel_features}")
 
@@ -244,62 +243,38 @@ class AnswerSpaceModel(nn.Module):
 
     def predict(
         self,
-        hyp: Tensor,
-        modes: Sequence[str]
+        hyp: Tensor
         ) -> Sequence[Sequence[int]]:
 
-        answers = [[] for _ in range(len(modes))]
+        answers = torch.empty((hyp.size(0)), dtype=torch.int64)
 
         with torch.no_grad():
             
-            # we tackle prediction mode-wise, since it requires relatively large matrix operations and
-            # using all entities and filtering afterwards is very slow.
-            for mode in set(modes):
+            # prepare features: (num_entities, 1, 1, embed_dim)
+            features = self.ent_features.weight.to(self.device)
+            features_ = features.reshape(features.size(0), 1, 1, features.size(1))
+            
+            # Calculate predictions batch-wise
+            for batch_idx, batch in enumerate(hyp):
+                
+                # batch shape (1, num_bands, band_size, embed_dim)
+                batch_ = batch.reshape(1, batch.size(0), batch.size(1), batch.size(2))
 
-                # batch indices that have this target mode
-                batch_mode_idx = torch.from_numpy(np.where(np.array(modes) == mode)[0]).to(self.device)
-
-                # select queries with this mode:
-                # (batch_size_mode, num_bands, band_size, embed_dim)
-                mode_hyp = torch.index_select(hyp, 0, batch_mode_idx) 
-
-                # select entity embeddings with this mode:
-                # (num_ents_mode, embed_dim)
-                mode_emb = self.ent_features(torch.tensor(self.nodes_per_mode[mode])).to(self.device)
-
-                # add extra dimension to hyperplanes for broadcasting:  
-                # from  (batch_size_mode, num_bands, band_size, embed_dim)
-                # to    (batch_size_mode, 1, num_bands, band_size, embed_dim)       
-                mode_hyp_1 = mode_hyp.reshape(mode_hyp.size(0), 1, mode_hyp.size(1), mode_hyp.size(2), mode_hyp.size(3))          
-
-                # add extra dimension for broadcasting:  
-                # from  (num_ents_mode, embed_dim)
-                # to    (1, num_ents_mode, 1, 1, embed_dim)
-                mode_emb_1 = mode_emb.reshape(1, mode_emb.size(0), 1, 1, mode_emb.size(1))
-
-                # calculate dot products of hyperplanes-embeddings
+                # calculate dot products of hyperplanes & embeddings
                 # and convert positive/negative dot products to binary values
-                # shape: (batch_size_mode, num_ents_mode, num_bands, band_size)
-                dot_inds = (torch.sum(mode_hyp_1 * mode_emb_1, dim=-1) > 0)
-
+                # shape: (num_entities, num_bands, band_size)
+                dot_inds = (torch.sum(features_ * batch_, dim=-1) > 0)
+                
                 # only if all hyperplanes in a band are positive and the band contains the answer
-                # shape: (batch_size_mode, num_ents_mode, num_bands)
+                # shape: (num_entities, num_bands)
                 band_inds = torch.all(dot_inds, dim=-1)
 
                 # if any band contains the entity, then the entity is a predicted answer
-                # shape: (batch_size_mode, num_ents_mode)
+                # shape: (num_entities)
                 ent_inds = torch.any(band_inds, dim=-1)
 
-                # iterate through all batches
-                for batch_idx, batch in zip(batch_mode_idx, ent_inds):
-                    # for all entities for that batch
-                    for ent_idx, ent_ind in enumerate(batch):
-                        # if the entity indicator is True (is in any band's answer space)
-                        if ent_ind:
-                            # we add the global entity index (=ID) to the answer list for that batch
-                            answers[batch_idx].append(self.nodes_per_mode[mode][ent_idx])
+                answers[batch_idx] = ent_inds.nonzero(as_tuple=True)[0]
                 
-        assert len(answers) == len(modes) == hyp.size(0)
         return answers
 
 
