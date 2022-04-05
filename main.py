@@ -1,16 +1,16 @@
 """Main script"""
 
 from time import sleep
-import wandb
-import logging
+# import wandb
+# import logging
 from argparse import ArgumentParser
 
-from helper import create_logger
-from loss import QASEAnswerSpaceLoss
-from models import AnswerSpaceModel
-from loader import *
-from train import train
-from evaluation import evaluate
+# from helper import create_logger
+# from loss import QASEAnswerSpaceLoss
+# from models import AnswerSpaceModel
+# from loader import *
+# from train import train
+# from evaluation import evaluate
 
 
 parser = ArgumentParser()
@@ -53,12 +53,12 @@ args = parser.parse_args()
 
 if args.nb:
     print("loading tqdm from notebook")
-    from tqdm.notebook import tqdm
+    import tqdm.notebook as tq
 else:
     print("loading tqdm from default")
-    from tqdm import tqdm
+    import tqdm as tq
 
-for x in tqdm(range(100)):
+for x in tq.tqdm(range(100)):
     print(f" this is {x}")
     sleep(1)
 
