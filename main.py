@@ -100,7 +100,7 @@ logging.info(f"Loss: {loss_fn}")
 if args.optim == "adam":
     optimizer = torch.optim.Adam(model.parameters(), args.lr)
 elif args.optim == "sgd":
-    optimizer = torch.optim.sgd(model.parameters(), args.lr)
+    optimizer = torch.optim.SGD(model.parameters(), args.lr)
 logging.info(f"Optimizer: {optimizer}")
 
 # Define learning rate scheduler
