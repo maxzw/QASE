@@ -253,7 +253,7 @@ def evaluate(
 
         # Add the average of the fractions of predicted answers respective to the total number of typed entities
         if epoch is not None:
-            answer_sizes[batch_id] = np.mean([len(a)/len(model.nodes_per_mode[m]) for a, m in zip(preds, y_info.pos_modes)])
+            answer_sizes[batch_id] = np.mean([len(a) for a in preds])
 
     # Log the average answer size from all batches
     if epoch is not None:
