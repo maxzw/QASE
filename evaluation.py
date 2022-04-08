@@ -249,6 +249,9 @@ def evaluate(
             model.nodes_per_mode,
             y_info.q_types,
             )
+        if epoch == 20:
+            np.save("preds.npy", preds, allow_pickle=True, fix_imports=True)
+            exit()
         classif_data.include(results)
 
         # Add the average of the fractions of predicted answers respective to the total number of typed entities
