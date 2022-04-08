@@ -262,7 +262,7 @@ def evaluate(
         # Track the embedding space coverage
         embs = model.ent_features.weight.clone().detach()
         bits = (embs > 0).float()
-        emb_space_coverage = bits.unique(dim=0).size(0) / 2**bits.size(1)
+        emb_space_coverage = bits.unique(dim=0).size(0) / bits.size(0)
         # Log metrics to WandB
         wandb.log({
             "val": {
