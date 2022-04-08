@@ -258,8 +258,17 @@ def evaluate(
         if epoch is not None:
             answer_sizes[batch_id] = np.mean([len(a) for a in preds])
 
-    # Log the average answer size from all batches
     if epoch is not None:
-        wandb.log({"val": {"mean_answer_size": np.mean(answer_sizes), "epoch_id": epoch}})
+        # Track the embedding space coverage
+        embs = model.ent_features.weight.clone().detach()
+        bits = (embs > 0).float()
+        emb_space_coverage = bits.unique(dim=0).size(0) / 2**bits.size(1)
+        # Log metrics to WandB
+        wandb.log({
+            "val": {
+                "mean_answer_size": np.mean(answer_sizes),
+                "emb_space_coverage": emb_space_coverage,
+                "epoch_id": epoch
+                }})
 
     return classif_data.finalize()
