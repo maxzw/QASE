@@ -106,11 +106,12 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         batch_loss = batch_pos_loss * self.pos_w + batch_neg_loss * self.neg_w# + batch_div_loss * self.div_w + batch_norm_loss * self.norm_w
 
         loss = torch.mean(batch_loss, dim=-1) # shape (1)
-        # p = torch.mean(batch_pos_loss.detach(), dim=-1).item()
-        # n = torch.mean(batch_neg_loss.detach(), dim=-1).item()
+        p = torch.mean(batch_pos_loss.detach(), dim=-1).item()
+        n = torch.mean(batch_neg_loss.detach(), dim=-1).item()
         # d = torch.mean(batch_div_loss.detach(), dim=-1).item()
         # n = torch.mean(batch_norm_loss.detach(), dim=-1).item()
-        return loss#, p, n, d, n
+        n = 0
+        return loss, p, n, d, n
 
     def __repr__(self):
         return f"QASEAnswerSpaceLoss(pos_w={self.pos_w}, neg_w={self.neg_w}, div_w={self.div_w}, norm_w={self.norm_w})"
