@@ -45,7 +45,7 @@ def _train_epoch(
         optimizer.zero_grad()
         hyp = model(x_info)
         pos_emb, neg_emb = model.embed_targets(y_info)
-        loss, p_loss, n_loss, d_loss = loss_fn(hyp, pos_emb, neg_emb)
+        loss, p_loss, n_loss, d_loss, _ = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
         

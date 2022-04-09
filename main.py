@@ -34,6 +34,7 @@ parser.add_argument("--gcn_share_w",    type=bool,  default=False,      help="If
 parser.add_argument("--pos_w",          type=float, default=1.0,        help="The weight of the positive loss")
 parser.add_argument("--neg_w",          type=float, default=1.0,        help="The weight of the negative loss")
 parser.add_argument("--div_w",          type=float, default=0.5,        help="The weight of the diversity loss")
+parser.add_argument("--norm_w",         type=float, default=0.5,        help="The weight of the norm loss")
 
 # Optimizer parameters
 parser.add_argument("--optim",          type=str,   default="adam",     help="Optimizer: ['adam', 'sgd']")
@@ -92,7 +93,8 @@ test_dataloader = get_dataloader(test_queries, batch_size = 128, shuffle=False, 
 loss_fn = QASEAnswerSpaceLoss(
     pos_w=args.pos_w,
     neg_w=args.neg_w,
-    div_w=args.div_w
+    div_w=args.div_w,
+    norm_w=args.norm_w
 )
 logging.info(f"Loss: {loss_fn}")
 
