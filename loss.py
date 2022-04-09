@@ -75,9 +75,9 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
 
         # angle diversity
         # get random normal vector to be reference vector for every band
-        ref_norm_idx = torch.randint(0, hyp.size(2)-1, (hyp.size(0), hyp.size(1), 1,))\
-            .repeat(1, 1, hyp.size(3)).view(hyp.size(0), hyp.size(1), 1, hyp.size(3))
-        ref_norms = torch.gather(hyp, 1, idx)
+        # ref_norm_idx = torch.randint(0, hyp.size(2)-1, (hyp.size(0), hyp.size(1), 1,))\
+        #     .repeat(1, 1, hyp.size(3)).view(hyp.size(0), hyp.size(1), 1, hyp.size(3))
+        # ref_norms = torch.gather(hyp, 1, ref_norm_idx)
         # calculate angle between reference vector and all other normal vectors (0, x, y, z, ...)
         # sort angles
         # define target angles as range with len(hyperplanes) and steps 2pi/len(hyperplanes)
