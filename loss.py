@@ -110,7 +110,7 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         n = torch.mean(batch_neg_loss.detach(), dim=-1).item()
         # d = torch.mean(batch_div_loss.detach(), dim=-1).item()
         # n = torch.mean(batch_norm_loss.detach(), dim=-1).item()
-        n = 0
+        d = 0
         return loss, p, n, d, n
 
     def __repr__(self):
