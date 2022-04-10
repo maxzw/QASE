@@ -1,4 +1,5 @@
 """Loss functions for hyperplane configurations"""
+import logging
 import random
 from typing import Tuple
 from abc import abstractmethod
@@ -6,6 +7,8 @@ from abc import abstractmethod
 import torch
 import torch.nn as nn
 from torch import Tensor
+
+logger = logging.getLogger(__name__)
 
 
 class AnswerSpaceLoss(nn.Module):
@@ -53,8 +56,6 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         ) -> Tuple[Tensor, float, float, float]:
 
         # hyp shape: (batch_size, num_bands, num_hyp, embed_dim)
-        
-        # positive cosine distance
         hyp = torch.nn.functional.normalize(hyp, dim=-1)
 
         # ----- positive cosine distance -----
@@ -68,10 +69,10 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         # ----- hyperplane diversity -----
 
         # get projection of normal vectors onto average normal vector
-        # avg_nv = torch.mean(hyp, dim=-2).reshape(hyp.size(0), hyp.size(1), 1, hyp.size(3))  # shape: (batch, num_bands, 1, embed_dim)
-        # numer = torch.sum(avg_nv * hyp, dim=-1)
-        # denom = torch.sum(hyp * hyp, dim=-1)
-        # hyp_proj = hyp - (numer / denom).reshape(hyp.size(0), hyp.size(1), hyp.size(2), 1) * hyp
+        avg_nv = torch.mean(hyp, dim=-2).reshape(hyp.size(0), hyp.size(1), 1, hyp.size(3))  # shape: (batch, num_bands, 1, embed_dim)
+        numer = torch.sum(avg_nv * hyp, dim=-1)
+        denom = torch.sum(hyp * hyp, dim=-1)
+        hyp_proj = hyp - (numer / denom).reshape(hyp.size(0), hyp.size(1), hyp.size(2), 1) * hyp
 
         # angle diversity
         # get random normal vector to be reference vector for every band
@@ -83,24 +84,25 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         # define target angles as range with len(hyperplanes) and steps 2pi/len(hyperplanes)
         # calculate difference in angle and take mean
 
-        # div_cos_sim = torch.cosine_similarity(hyp_proj, hyp_proj[:, :, self.shuffled_indices(hyp.size(2)), :], dim=-1) # shape: (batch, num_bands, num_hyp)
+        div_cos_sim = torch.cosine_similarity(hyp_proj, hyp_proj[:, :, self.shuffled_indices(hyp.size(2)), :], dim=-1) # shape: (batch, num_bands, num_hyp)
 
         # angle from average normal vector (with norm as proxy)
-        # we want the norm to be 1, so we minimize on -norm
-        # hyp_proj_norm = -torch.norm(hyp_proj, dim=-1) # shape: (batch, num_bands, num_hyp)
+        hyp_proj_norm = torch.norm(hyp_proj, dim=-1) # shape: (batch, num_bands, num_hyp)
 
         # calculate band distance:
+        # we want positive cosine distance to be 1, so we minimize on -cosine distance
         band_pos_loss   = -torch.mean(pos_cos_sim, dim=-1)    # shape (batch, num_bands)
         band_neg_loss   =  torch.mean(neg_cos_sim, dim=-1)    # shape (batch, num_bands)
-        # band_div_loss   =  torch.mean(div_cos_sim, dim=-1)    # shape (batch, num_bands)
-        # band_norm_loss  = -torch.mean(hyp_proj_norm, dim=-1)  # shape (batch, num_bands)
+        band_div_loss   =  torch.mean(div_cos_sim, dim=-1)    # shape (batch, num_bands)
+        # we want the norm to be 1, so we minimize on -norm
+        band_norm_loss  = -torch.mean(hyp_proj_norm, dim=-1)  # shape (batch, num_bands)
 
         # aggregate band distances:
         focus           = torch.softmax(-band_pos_loss, dim=-1)
         batch_pos_loss  = torch.sum(band_pos_loss * focus, dim=-1)       # shape (batch)
         batch_neg_loss  = torch.mean(band_neg_loss, dim=-1)              # shape (batch)
-        # batch_div_loss  = torch.sum(band_div_loss * focus, dim=-1)       # shape (batch)
-        # batch_norm_loss = torch.mean(band_norm_loss * focus, dim=-1)    # shape (batch)
+        batch_div_loss  = torch.sum(band_div_loss * focus, dim=-1)       # shape (batch)
+        batch_norm_loss = torch.mean(band_norm_loss * focus, dim=-1)    # shape (batch)
 
         # calculate margin loss
         batch_loss = batch_pos_loss * self.pos_w + batch_neg_loss * self.neg_w# + batch_div_loss * self.div_w + batch_norm_loss * self.norm_w
@@ -108,10 +110,14 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
         loss = torch.mean(batch_loss, dim=-1) # shape (1)
         p = torch.mean(batch_pos_loss.detach(), dim=-1).item()
         n = torch.mean(batch_neg_loss.detach(), dim=-1).item()
-        # d = torch.mean(batch_div_loss.detach(), dim=-1).item()
-        # n = torch.mean(batch_norm_loss.detach(), dim=-1).item()
-        d = 0
-        return loss, p, n, d, n
+        d = torch.mean(batch_div_loss.detach(), dim=-1).item()
+        no = torch.mean(batch_norm_loss.detach(), dim=-1).item()
+
+        focus_s = torch.sort(focus, dim=-1, descending=True)[0]
+        focus_s_mean = torch.mean(focus_s, dim=0)
+        logger.log(f"focus_s_mean: {focus_s_mean}")
+
+        return loss, p, n, d, no
 
     def __repr__(self):
         return f"QASEAnswerSpaceLoss(pos_w={self.pos_w}, neg_w={self.neg_w}, div_w={self.div_w}, norm_w={self.norm_w})"
