@@ -248,6 +248,8 @@ class AnswerSpaceModel(nn.Module):
 
         answers = [[] for _ in range(hyp.size(0))]
 
+        contr = torch.empty((hyp.size(0), hyp.size(1)))
+
         with torch.no_grad():
             
             # prepare features: (num_entities, 1, 1, embed_dim)
@@ -273,9 +275,14 @@ class AnswerSpaceModel(nn.Module):
                 # shape: (num_entities)
                 ent_inds = torch.any(band_inds, dim=-1)
 
+                band_contribution = torch.sum(band_inds, dim=0)                                 # shape: (num_bands)
+                band_contribution = band_contribution / torch.sum(band_contribution, dim=-1)    # shape: (num_bands)
+                band_contribution = torch.sort(band_contribution, descending=False)[0]          # shape: (num_bands)
+                contr[batch_idx] = band_contribution
+
                 answers[batch_idx] = ent_inds.nonzero(as_tuple=True)[0].tolist()
                 
-        return answers
+        return answers, torch.mean(contr, dim=0)
 
 
     def forward(self, batch: QueryBatchInfo) -> Tensor:
