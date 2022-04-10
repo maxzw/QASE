@@ -115,7 +115,7 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
 
         focus_s = torch.sort(focus, dim=-1, descending=True)[0]
         focus_s_mean = torch.mean(focus_s, dim=0)
-        logger.log(f"focus_s_mean: {focus_s_mean}")
+        logger.info(f"focus_s_mean: {focus_s_mean}")
 
         return loss, p, n, d, no
 
