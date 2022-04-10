@@ -242,7 +242,7 @@ def evaluate(
         
         hyp = model(x_info)
         preds, contr = model.predict(hyp)
-        logger.info("Conintribution:", contr)
+        logger.info(f"Conintribution: {contr}")
         results = classification_metrics(
             preds,
             y_info.target_nodes,

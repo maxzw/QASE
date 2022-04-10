@@ -273,11 +273,12 @@ class AnswerSpaceModel(nn.Module):
 
                 # if any band contains the entity, then the entity is a predicted answer
                 # shape: (num_entities)
-                ent_inds = torch.any(band_inds, dim=-1)
+                # ent_inds = torch.any(band_inds, dim=-1)
+                ent_inds = band_inds[:, 0]
 
                 band_contribution = torch.sum(band_inds, dim=0)                                 # shape: (num_bands)
                 band_contribution = band_contribution / torch.sum(band_contribution, dim=-1)    # shape: (num_bands)
-                band_contribution = torch.sort(band_contribution, descending=False)[0]          # shape: (num_bands)
+                band_contribution, _ = torch.sort(band_contribution, descending=False)          # shape: (num_bands)
                 contr[batch_idx] = band_contribution
 
                 answers[batch_idx] = ent_inds.nonzero(as_tuple=True)[0].tolist()
