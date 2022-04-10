@@ -37,6 +37,8 @@ def _train_epoch(
     pos_distances = []
     neg_distances = []
     div_distances = []
+
+    mean_foc = torch.empty((len(dataloader),model.num_bands))
     
     x_info: QueryBatchInfo
     y_info: QueryTargetInfo
@@ -45,9 +47,11 @@ def _train_epoch(
         optimizer.zero_grad()
         hyp = model(x_info)
         pos_emb, neg_emb = model.embed_targets(y_info)
-        loss, p_loss, n_loss, d_loss, _ = loss_fn(hyp, pos_emb, neg_emb)
+        loss, p_loss, n_loss, d_loss, _, focus = loss_fn(hyp, pos_emb, neg_emb)
         loss.backward()
         optimizer.step()
+
+        mean_foc[batch_nr] = focus
         
         loss_val = loss.detach().item()
         # Log batch metrics to WandB
@@ -61,6 +65,9 @@ def _train_epoch(
         pos_distances.append(p_loss)
         neg_distances.append(n_loss)
         div_distances.append(d_loss)
+
+    # mean focus
+    logger.info(f"Mean focus: {torch.mean(focus, dim=0).detach().cpu().numpy()}")
     
     # Log epoch metrics to WandB
     mean_loss   = np.mean(batch_losses)

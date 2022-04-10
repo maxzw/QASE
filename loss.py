@@ -115,9 +115,8 @@ class QASEAnswerSpaceLoss(AnswerSpaceLoss):
 
         focus_s = torch.sort(focus, dim=-1, descending=True)[0]
         focus_s_mean = torch.mean(focus_s, dim=0)
-        logger.info(f"focus_s_mean: {focus_s_mean}")
 
-        return loss, p, n, d, no
+        return loss, p, n, d, no, focus_s_mean
 
     def __repr__(self):
         return f"QASEAnswerSpaceLoss(pos_w={self.pos_w}, neg_w={self.neg_w}, div_w={self.div_w}, norm_w={self.norm_w})"
